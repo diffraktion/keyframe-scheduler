@@ -2,6 +2,14 @@
 
 ## Component
 
+### [Unreleased]
+
+#### Changed
+- Web app restyled on the LKL UI style guide 1.0.0 (`www/styleguide/`): design tokens, glass/paper skins, day/night/auto theme with switcher in the header
+- Chart colours follow the active theme; PDF export always renders the chart on white
+
+---
+
 ### [3.0.10] - 2026-03-13
 
 #### Added

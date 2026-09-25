@@ -1,0 +1,632 @@
+/* =============================================================================
+   LKL UI — Theme Tokens
+   Licht Kunst Licht AG
+   Version 1.0.0 · 2026-09-09
+   =============================================================================
+   Two independent axes, both set as attributes on the <html> element:
+
+     data-theme  = "day" | "night"       Brightness
+     data-skin   = "glass" | "paper"     Materiality
+     data-accent = "copper" | "blue"     Accent colour (provisional, until the
+                                         brand identity is settled)
+
+   Three layers, strictly separated:
+
+     1. PRIMITIVES  Raw values, theme-neutral. Never use these in components.
+     2. THEME       Brightness semantics. Defines the "ingredients".
+     3. SKIN        Materiality. Picks from the ingredients and sets geometry.
+
+   RULE: component CSS uses layer-2/3 tokens EXCLUSIVELY (--lkl-surface,
+   --lkl-text, --lkl-accent …). Never a hex value, never a primitive. That is the
+   only reason a theme switch works without rework.
+
+   The contrast ratios in the comments are measured against the actual text
+   surface (--lkl-surface over the page background), not against pure white.
+   Target: WCAG AA, 4.5:1 for body text.
+   ============================================================================= */
+
+
+/* -----------------------------------------------------------------------------
+   1  PRIMITIVES
+   -------------------------------------------------------------------------- */
+:root {
+  /* Neutral warm grey scale (greige). The theme layer references these values
+     rather than repeating them — so the house base tone can be shifted in
+     exactly one place.
+     Deliberately lighter than the prototype (#e4e1da / #cfccc3): the more
+     transparent the surfaces, the more the page background bleeds into text
+     contrast. The darkest point of the scene is the yardstick for WCAG AA. */
+  --lkl-greige-100: #ebe8e1;
+  --lkl-greige-200: #e6e2da;
+  --lkl-greige-800: #2a2924;
+  --lkl-greige-900: #1c1b18;
+  /* The black the night scene runs out into. Not pure #000: a trace of warmth
+     keeps it in the same family as the rest of the palette, and an absolute
+     black would read as a hole punched in the screen rather than as a room. */
+  --lkl-greige-950: #070605;
+
+  /* Geometry */
+  --lkl-space-1: 4px;
+  --lkl-space-2: 8px;
+  --lkl-space-3: 12px;
+  --lkl-space-4: 16px;
+  --lkl-space-5: 24px;
+  --lkl-space-6: 32px;
+
+  /* Type scale — deliberately tight, six steps are enough */
+  --lkl-fs-xs:   10.5px;
+  --lkl-fs-sm:   11.5px;
+  --lkl-fs-md:   12.5px;
+  --lkl-fs-base: 13px;
+  --lkl-fs-lg:   15px;
+  --lkl-fs-xl:   20px;
+
+  --lkl-lh-tight: 1.35;
+  --lkl-lh-base:  1.55;
+
+  /* Font families (the skin picks). Paper gets a humanist sans plus a serif
+     for headings — Source Sans and Source Serif are one superfamily, so they
+     harmonise by design. Mono is reserved strictly for numbers, formulas and
+     filenames: there the fixed advance width does a job. Everywhere else it
+     only produces a lab-coat impression. */
+  --lkl-family-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --lkl-family-text:   "Source Sans 3", "Source Sans Pro", Seravek, "Segoe UI", Roboto, sans-serif;
+  --lkl-family-serif:  "Source Serif 4", "Source Serif Pro", Charter, Georgia, "Times New Roman", serif;
+  --lkl-family-mono:   "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --lkl-dur: .15s;
+}
+
+
+/* -----------------------------------------------------------------------------
+   2  THEME — brightness
+   -------------------------------------------------------------------------- */
+
+/* ---- DAY ---------------------------------------------------------------- */
+[data-theme="day"] {
+  /* Page background: base gradient + five LIGHT BEAMS. We build for the
+     lighting industry, so the background is not wallpaper but a lighting
+     situation. Day is a daylight-flooded surface; the beams sit on the
+     Planckian locus between 2700 K and 6500 K, plus two bounce colours off
+     wall and greenery.
+     Each beam is written as an RGB triple + intensity so the skin can build a
+     multi-stop falloff from it (see section 4). */
+  --lkl-bg-a:    var(--lkl-greige-100);
+  --lkl-bg-b:    var(--lkl-greige-200);
+  /* Day has no vignette: darkening the edges would eat contrast here, because
+     by day the DARKEST point is the yardstick. Fully transparent, so the
+     shared gradient layer simply does nothing. */
+  --lkl-vignette: rgba(0,0,0,0);
+  --lkl-beam-1:   255,206,178;  --lkl-beam-1-i: .50;   /* 2700 K sun        */
+  --lkl-beam-2:   200,218,245;  --lkl-beam-2-i: .42;   /* 6500 K sky        */
+  --lkl-beam-3:   206,232,214;  --lkl-beam-3-i: .42;   /* green bounce      */
+  --lkl-beam-4:   232,210,240;  --lkl-beam-4-i: .38;   /* dusk bounce       */
+  --lkl-beam-5:   255,238,205;  --lkl-beam-5-i: .34;   /* 3000 K warm light */
+
+  /* Surface ingredients — the skin decides which becomes --lkl-surface.
+     Far more transparent than the prototype (.55/.40/.35): surfaces should
+     read as a pane of glass, not as a white box. The floor is computed, not
+     guessed — contrast of --lkl-text-3 on the THINNEST surface (glass-3) over
+     the DARKEST point of the lighting scene. Currently 4.8:1, so some room. */
+  --lkl-glass-1:  rgba(255,255,255,0.26);
+  --lkl-glass-2:  rgba(255,255,255,0.22);
+  --lkl-glass-3:  rgba(255,255,255,0.18);
+  --lkl-solid-1:  #fffdf9;
+  --lkl-solid-2:  #f7f5f0;
+  --lkl-solid-3:  #ffffff;
+
+  /* Edge ingredients */
+  --lkl-border-soft: rgba(120,118,110,0.22);
+  --lkl-border-hard: #c9c5bb;
+  --lkl-border-glow: rgba(255,255,255,0.80);   /* top inset highlight */
+
+  /* Text — contrast against the thinnest glass surface (glass-3) over the
+     darkest point of the scene, i.e. against the page's worst case. */
+  --lkl-text:   var(--lkl-greige-800);   /* #2a2924 — 11.3:1 */
+  --lkl-text-2: #5c584f;   /*  5.5:1 */
+  --lkl-text-3: #656159;   /*  4.8:1  — lowest permissible step */
+
+  /* Accent candidates; data-accent picks one */
+  --lkl-a-copper:     #8f4c1b;   /* 4.9:1 */
+  --lkl-a-copper-rgb: 143,76,27;
+  --lkl-a-blue:       #3c5a80;   /* 5.3:1 */
+  --lkl-a-blue-rgb:   80,110,160;
+  --lkl-accent-on:     #ffffff;  /* text on a filled accent surface */
+  --lkl-accent-bg:     rgba(var(--lkl-accent-rgb), 0.14);
+  --lkl-accent-border: rgba(var(--lkl-accent-rgb), 0.40);
+
+  /* Status — every role has a TEXT colour AND a SURFACE colour */
+  --lkl-ok:            #2f6a4c;   /* 4.8:1 */
+  --lkl-ok-bg:         rgba(47,106,76,0.12);
+  --lkl-ok-border:     rgba(47,106,76,0.32);
+  --lkl-warn:          #745816;   /* 5.0:1 — darkened; #7d5f18 dropped to 4.5 */
+  --lkl-warn-bg:       rgba(116,88,22,0.14);
+  --lkl-warn-border:   rgba(116,88,22,0.34);
+  --lkl-danger:        #a03028;   /* 5.3:1 */
+  --lkl-danger-bg:     rgba(160,48,40,0.11);
+  --lkl-danger-border: rgba(160,48,40,0.30);
+
+  --lkl-shadow-glass: 0 24px 70px rgba(0,0,0,0.10);
+  --lkl-shadow-card:  0 4px 16px rgba(0,0,0,0.06);
+  --lkl-focus:        rgba(var(--lkl-accent-rgb), 0.35);
+
+  color-scheme: light;
+}
+
+/* ---- NIGHT -------------------------------------------------------------- */
+[data-theme="night"] {
+  /* The night runs out into black: the base gradient ends near-black, and the
+     vignette below pulls the edges down as well. Both only ever DARKEN, and
+     the night worst case is the LIGHTEST point of the page — so this direction
+     is free of contrast risk and in fact buys headroom. */
+  --lkl-bg-a:    var(--lkl-greige-900);
+  --lkl-bg-b:    var(--lkl-greige-950);
+  --lkl-vignette: rgba(0,0,0,0.60);
+  /* The night scene is a dark room with pools of light — exactly what we
+     design for a living. Two warm spots (2700 K / 3000 K), one cool spill
+     from outside (6500 K) and two deep ambient tones.
+
+     CRUCIAL, and not something you can guess on screen: at night this calls
+     for DEEP, SATURATED colours at HIGH alpha — not pale ones at low alpha.
+     Chroma is nearly free in the contrast budget; only lightness costs. A
+     saturated beam rgb(25,40,110) at .38 is clearly visible and costs less
+     luminance than a washed-out rgb(80,110,190) at .13 that you can barely
+     see. The first draft had precisely the wrong combination here: light and
+     weak — expensive and invisible at the same time.
+
+     During the day it is the OTHER WAY ROUND: there the darkest point is the
+     yardstick, so pale desaturated beams are correct and deep ones costly. */
+  --lkl-beam-1:   130, 60, 12;  --lkl-beam-1-i: .34;   /* 2700 K spot         */
+  --lkl-beam-2:   110, 62, 25;  --lkl-beam-2-i: .26;   /* 3000 K wall washer  */
+  --lkl-beam-3:    40, 70,140;  --lkl-beam-3-i: .32;   /* 6500 K spill        */
+  --lkl-beam-4:    25, 40,110;  --lkl-beam-4-i: .38;   /* deep blue ambient   */
+  --lkl-beam-5:    70, 35,110;  --lkl-beam-5-i: .32;   /* violet dusk         */
+
+  /* Glass stays WHITE light at night too — just quieter. This is exactly
+     where naive dark modes fall over: switch to black alpha and the material
+     impression is gone, leaving matte holes instead of panes.
+     Note the reversed order compared to day: at night the RAISED surface
+     (glass-2) is the lightest and therefore the worst case for the contrast
+     budget — during the day it is the thinnest one (glass-3). */
+  --lkl-glass-1:  rgba(255,255,255,0.05);
+  --lkl-glass-2:  rgba(255,255,255,0.07);
+  --lkl-glass-3:  rgba(255,255,255,0.04);
+  --lkl-solid-1:  #26251f;
+  --lkl-solid-2:  #2c2b25;
+  --lkl-solid-3:  #1c1b18;
+
+  --lkl-border-soft: rgba(255,255,255,0.12);
+  --lkl-border-hard: #3d3b35;
+  --lkl-border-glow: rgba(255,255,255,0.10);
+
+  /* Measured against the brightest point of the scene — at night the worst
+     case is the light spot, not the dark one. */
+  --lkl-text:   #ece9e2;   /* 9.2:1 */
+  --lkl-text-2: #bdb9af;   /*  5.7:1 */
+  --lkl-text-3: #adaa9f;   /*  4.8:1  — lowest permissible step */
+
+  --lkl-a-copper:     #e0a06a;   /* 5.0:1 */
+  --lkl-a-copper-rgb: 224,160,106;
+  --lkl-a-blue:       #8fb2e0;   /* 5.1:1 */
+  --lkl-a-blue-rgb:   143,178,224;
+  --lkl-accent-on:     var(--lkl-greige-900);  /* dark text on a light accent */
+  --lkl-accent-bg:     rgba(var(--lkl-accent-rgb), 0.18);
+  --lkl-accent-border: rgba(var(--lkl-accent-rgb), 0.42);
+
+  --lkl-ok:            #7fc9a0;   /* 5.7:1 */
+  --lkl-ok-bg:         rgba(127,201,160,0.14);
+  --lkl-ok-border:     rgba(127,201,160,0.32);
+  --lkl-warn:          #dcb45f;   /* 5.7:1 */
+  --lkl-warn-bg:       rgba(220,180,95,0.14);
+  --lkl-warn-border:   rgba(220,180,95,0.32);
+  --lkl-danger:        #e89a92;   /* 5.0:1 */
+  --lkl-danger-bg:     rgba(232,154,146,0.13);
+  --lkl-danger-border: rgba(232,154,146,0.30);
+
+  --lkl-shadow-glass: 0 24px 70px rgba(0,0,0,0.45);
+  --lkl-shadow-card:  0 4px 16px rgba(0,0,0,0.30);
+  --lkl-focus:        rgba(var(--lkl-accent-rgb), 0.45);
+
+  color-scheme: dark;
+}
+
+/* ---- Accent selection -----------------------------------------------------
+   Resolves on the same element as data-theme (both live on <html>), so the
+   theme-dependent definition of --lkl-a-* applies correctly. Custom properties
+   are substituted at use time, so block order does not matter. */
+[data-accent="copper"] { --lkl-accent: var(--lkl-a-copper); --lkl-accent-rgb: var(--lkl-a-copper-rgb); }
+[data-accent="blue"]   { --lkl-accent: var(--lkl-a-blue);   --lkl-accent-rgb: var(--lkl-a-blue-rgb); }
+
+
+/* -----------------------------------------------------------------------------
+   3  SKIN — materiality
+   -------------------------------------------------------------------------- */
+
+[data-skin="glass"] {
+  --lkl-surface:   var(--lkl-glass-1);
+  --lkl-surface-2: var(--lkl-glass-2);
+  --lkl-shell:     var(--lkl-glass-3);
+  --lkl-field:     var(--lkl-glass-2);
+  --lkl-border:    var(--lkl-border-soft);
+
+  --lkl-radius:      16px;
+  --lkl-radius-lg:   28px;
+  --lkl-radius-sm:   10px;
+  --lkl-radius-pill: 999px;
+
+  /* Slightly more blur and saturation than the prototype: the more
+     transparent the surface, the more refraction has to carry materiality. */
+  --lkl-blur:   blur(24px) saturate(180%);
+  --lkl-shadow: var(--lkl-shadow-glass);
+  --lkl-inset:  inset 0 1px 0 var(--lkl-border-glow);
+
+  --lkl-font:      var(--lkl-family-system);
+  --lkl-font-mono: var(--lkl-family-mono);
+  --lkl-font-head: var(--lkl-family-system);
+}
+
+[data-skin="paper"] {
+  --lkl-surface:   var(--lkl-solid-1);
+  --lkl-surface-2: var(--lkl-solid-2);
+  --lkl-shell:     transparent;
+  --lkl-field:     var(--lkl-solid-3);
+  --lkl-border:    var(--lkl-border-hard);
+
+  --lkl-radius:      8px;
+  --lkl-radius-lg:   12px;
+  --lkl-radius-sm:   6px;
+  --lkl-radius-pill: 6px;
+
+  /* "Off" is written as a transparent shadow, not as none:
+     box-shadow: none, none is invalid CSS and would drop the whole
+     shorthand — including the second shadow. */
+  --lkl-blur:   none;
+  --lkl-shadow: 0 0 0 rgba(0,0,0,0);
+  --lkl-inset:  inset 0 0 0 rgba(0,0,0,0);
+
+  --lkl-font:      var(--lkl-family-text);
+  --lkl-font-mono: var(--lkl-family-mono);
+  --lkl-font-head: var(--lkl-family-serif);
+}
+
+
+/* -----------------------------------------------------------------------------
+   4  PAGE BACKGROUND
+   A fixed pseudo-element instead of background-attachment:fixed — the latter
+   is effectively broken on iOS Safari and provokes repaints while scrolling.
+   -------------------------------------------------------------------------- */
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--lkl-font);
+  font-size: var(--lkl-fs-base);
+  line-height: var(--lkl-lh-base);
+  color: var(--lkl-text);
+  background: var(--lkl-bg-a);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+/* LIGHT BEAMS — five soft pools of light over a base gradient.
+   The point is not decoration but legibility of the material: on a flat
+   single-colour ground, transparency is invisible because there is nothing to
+   shine through. The beams are deliberately larger than the viewport and have
+   no hard edge, so the 24px blur of the panes smooths them locally into an
+   almost uniform average.
+
+   Each beam has THREE stops instead of two. A CSS gradient interpolates
+   linearly, while real light falls off with the square of distance (1/r²) —
+   the middle stop at 38 % radius with 50 % intensity approximates that curve.
+   The difference is subtle, but it is why the beams read as light rather than
+   as colour gradients. This is also why colour and intensity are stored
+   separately in the theme layer: only then can the intensity be scaled down
+   per stop without repeating the colour.
+
+   Note: only the PEAK value governs the contrast budget, so the falloff can be
+   flattened freely by eye — see the rules in index.html. */
+[data-skin="glass"] body::before {
+  background:
+    /* Vignette FIRST, i.e. on top of everything: it has to pull the beams
+       down at the edges too, not just the base gradient. Physically that is
+       the right way round — the room falls off into darkness, and the light
+       pools fall off with it. Transparent by day, so this layer is inert
+       there. Both stops are black-hued, so no grey cast in the interpolation. */
+    radial-gradient(130% 100% at 50% 32%,
+      rgba(0,0,0,0) 30%,
+      var(--lkl-vignette) 100%),
+    radial-gradient(62% 58% at 10%  6%,
+      rgba(var(--lkl-beam-1), var(--lkl-beam-1-i)) 0%,
+      rgba(var(--lkl-beam-1), calc(var(--lkl-beam-1-i) * .50)) 38%,
+      rgba(var(--lkl-beam-1), 0) 78%),
+    radial-gradient(58% 52% at 90% 12%,
+      rgba(var(--lkl-beam-2), var(--lkl-beam-2-i)) 0%,
+      rgba(var(--lkl-beam-2), calc(var(--lkl-beam-2-i) * .50)) 38%,
+      rgba(var(--lkl-beam-2), 0) 78%),
+    radial-gradient(66% 60% at  6% 92%,
+      rgba(var(--lkl-beam-3), var(--lkl-beam-3-i)) 0%,
+      rgba(var(--lkl-beam-3), calc(var(--lkl-beam-3-i) * .50)) 38%,
+      rgba(var(--lkl-beam-3), 0) 78%),
+    radial-gradient(60% 56% at 94% 88%,
+      rgba(var(--lkl-beam-4), var(--lkl-beam-4-i)) 0%,
+      rgba(var(--lkl-beam-4), calc(var(--lkl-beam-4-i) * .50)) 38%,
+      rgba(var(--lkl-beam-4), 0) 78%),
+    radial-gradient(54% 48% at 48% 46%,
+      rgba(var(--lkl-beam-5), var(--lkl-beam-5-i)) 0%,
+      rgba(var(--lkl-beam-5), calc(var(--lkl-beam-5-i) * .50)) 42%,
+      rgba(var(--lkl-beam-5), 0) 82%),
+    linear-gradient(160deg, var(--lkl-bg-a), var(--lkl-bg-b));
+}
+/* Paper is a calm, unpatterned ground. No grid: the graph paper was a quirk
+   of the voltage-drop calculator, not a house trait — and it competes with
+   every data table placed on top of it. */
+[data-skin="paper"] body::before {
+  background: linear-gradient(180deg, var(--lkl-bg-a), var(--lkl-bg-b));
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+
+/* =============================================================================
+   5  COMPONENTS
+   From here on there is not a single hex value or primitive — only tokens.
+   ============================================================================= */
+
+/* ---- Surfaces ------------------------------------------------------------ */
+.lkl-shell {
+  background: var(--lkl-shell);
+  border: 1px solid var(--lkl-border);
+  border-radius: var(--lkl-radius-lg);
+  box-shadow: var(--lkl-shadow), var(--lkl-inset);
+  backdrop-filter: var(--lkl-blur);
+  -webkit-backdrop-filter: var(--lkl-blur);
+  overflow: hidden;
+}
+
+.lkl-card {
+  background: var(--lkl-surface);
+  border: 1px solid var(--lkl-border);
+  border-radius: var(--lkl-radius);
+  box-shadow: var(--lkl-inset);
+  backdrop-filter: var(--lkl-blur);
+  -webkit-backdrop-filter: var(--lkl-blur);
+  padding: var(--lkl-space-4);
+}
+.lkl-card.is-current {
+  border-color: var(--lkl-accent-border);
+  box-shadow: var(--lkl-shadow-card), var(--lkl-inset);
+}
+
+/* ---- Typography ---------------------------------------------------------- */
+.lkl-h1 { font-family: var(--lkl-font-head); font-size: var(--lkl-fs-xl); font-weight: 600; margin: 0; letter-spacing: -0.01em; line-height: var(--lkl-lh-tight); }
+.lkl-h2 {
+  font-family: var(--lkl-font-head); font-size: var(--lkl-fs-sm); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.10em; color: var(--lkl-accent);
+  margin: 0 0 var(--lkl-space-3);
+}
+.lkl-sub     { font-size: var(--lkl-fs-md); color: var(--lkl-text-2); margin: 0; }
+.lkl-meta    { font-size: var(--lkl-fs-xs); color: var(--lkl-text-3); }
+.lkl-mono    { font-family: var(--lkl-font-mono); }
+
+/* ---- Buttons ------------------------------------------------------------- */
+.lkl-btn {
+  font: inherit; font-size: var(--lkl-fs-md); font-weight: 600;
+  padding: var(--lkl-space-2) var(--lkl-space-4);
+  border-radius: var(--lkl-radius-sm);
+  border: 1px solid var(--lkl-border);
+  background: var(--lkl-surface-2);
+  color: var(--lkl-text);
+  cursor: pointer;
+  transition: background var(--lkl-dur), border-color var(--lkl-dur), color var(--lkl-dur);
+}
+.lkl-btn:hover { border-color: var(--lkl-accent-border); color: var(--lkl-accent); }
+.lkl-btn:focus-visible { outline: 2px solid var(--lkl-accent); outline-offset: 2px; }
+
+.lkl-btn.is-primary {
+  background: var(--lkl-accent);
+  border-color: var(--lkl-accent);
+  color: var(--lkl-accent-on);
+}
+.lkl-btn.is-primary:hover { filter: brightness(1.08); color: var(--lkl-accent-on); }
+
+.lkl-btn.is-quiet { background: transparent; border-color: transparent; color: var(--lkl-text-2); }
+.lkl-btn.is-quiet:hover { background: var(--lkl-surface-2); color: var(--lkl-accent); }
+
+/* ---- Chips / segmented controls ------------------------------------------- */
+.lkl-chip {
+  font: inherit; font-size: var(--lkl-fs-md);
+  padding: var(--lkl-space-2) var(--lkl-space-4);
+  border-radius: var(--lkl-radius-pill);
+  border: 1px solid var(--lkl-border);
+  background: var(--lkl-surface-2);
+  color: var(--lkl-text);
+  cursor: pointer;
+  backdrop-filter: var(--lkl-blur);
+  -webkit-backdrop-filter: var(--lkl-blur);
+  transition: background var(--lkl-dur), box-shadow var(--lkl-dur);
+}
+.lkl-chip:hover { background: var(--lkl-surface); }
+.lkl-chip:focus-visible { outline: 2px solid var(--lkl-accent); outline-offset: 2px; }
+.lkl-chip.is-active {
+  background: var(--lkl-accent-bg);
+  border-color: var(--lkl-accent-border);
+  color: var(--lkl-accent);
+  font-weight: 600;
+}
+.lkl-chip .lkl-chip-code { opacity: .55; font-size: var(--lkl-fs-xs); }
+
+.lkl-chip-row { display: flex; flex-wrap: wrap; gap: var(--lkl-space-2); }
+
+/* ---- Status pills ---------------------------------------------------------
+   RULE: state is communicated through pills, not through tinted surfaces.
+   Surface colour stays reserved for the warning/error layer. */
+.lkl-pill {
+  display: inline-block;
+  font-size: var(--lkl-fs-xs);
+  padding: var(--lkl-space-1) var(--lkl-space-3);
+  border-radius: var(--lkl-radius-pill);
+  border: 1px solid var(--lkl-border);
+  background: var(--lkl-surface-2);
+  color: var(--lkl-text-3);
+  white-space: nowrap;
+}
+.lkl-pill.is-accent { background: var(--lkl-accent-bg); border-color: var(--lkl-accent-border); color: var(--lkl-accent); font-weight: 600; }
+.lkl-pill.is-ok     { background: var(--lkl-ok-bg);     border-color: var(--lkl-ok-border);     color: var(--lkl-ok);     font-weight: 600; }
+.lkl-pill.is-warn   { background: var(--lkl-warn-bg);   border-color: var(--lkl-warn-border);   color: var(--lkl-warn);   font-weight: 600; }
+.lkl-pill.is-danger { background: var(--lkl-danger-bg); border-color: var(--lkl-danger-border); color: var(--lkl-danger); }
+.lkl-pill.is-muted  { text-decoration: line-through; opacity: .75; }
+
+/* ---- Form fields ---------------------------------------------------------- */
+.lkl-label { display: block; font-size: var(--lkl-fs-md); color: var(--lkl-text-2); margin-bottom: var(--lkl-space-1); }
+.lkl-input, .lkl-select {
+  width: 100%;
+  font: inherit; font-size: var(--lkl-fs-base);
+  font-family: var(--lkl-font-mono);
+  padding: var(--lkl-space-2) var(--lkl-space-3);
+  border: 1px solid var(--lkl-border);
+  border-radius: var(--lkl-radius-sm);
+  background: var(--lkl-field);
+  color: var(--lkl-text);
+  outline: none;
+  transition: border-color var(--lkl-dur), box-shadow var(--lkl-dur);
+}
+.lkl-select { font-family: var(--lkl-font); }
+.lkl-input:focus, .lkl-select:focus {
+  border-color: var(--lkl-accent);
+  box-shadow: 0 0 0 3px var(--lkl-focus);
+}
+.lkl-input::placeholder { color: var(--lkl-text-3); }
+
+/* ---- Stat tiles ----------------------------------------------------------- */
+.lkl-stat {
+  background: var(--lkl-surface);
+  border: 1px solid var(--lkl-border);
+  border-radius: var(--lkl-radius);
+  box-shadow: var(--lkl-inset);
+  backdrop-filter: var(--lkl-blur);
+  -webkit-backdrop-filter: var(--lkl-blur);
+  padding: var(--lkl-space-3) var(--lkl-space-4);
+}
+.lkl-stat-label { font-size: var(--lkl-fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--lkl-text-3); margin-bottom: var(--lkl-space-1); }
+.lkl-stat-value { font-family: var(--lkl-font-mono); font-size: var(--lkl-fs-xl); font-weight: 700; color: var(--lkl-text); line-height: 1.2; }
+.lkl-stat-value.is-ok     { color: var(--lkl-ok); }
+.lkl-stat-value.is-warn   { color: var(--lkl-warn); }
+.lkl-stat-value.is-danger { color: var(--lkl-danger); }
+
+/* ---- Banners -------------------------------------------------------------- */
+.lkl-banner {
+  font-size: var(--lkl-fs-md);
+  border: 1px solid var(--lkl-border);
+  background: var(--lkl-surface-2);
+  color: var(--lkl-text-2);
+  border-radius: var(--lkl-radius-sm);
+  padding: var(--lkl-space-3) var(--lkl-space-4);
+}
+.lkl-banner.is-ok     { background: var(--lkl-ok-bg);     border-color: var(--lkl-ok-border);     color: var(--lkl-ok); }
+.lkl-banner.is-warn   { background: var(--lkl-warn-bg);   border-color: var(--lkl-warn-border);   color: var(--lkl-warn); }
+.lkl-banner.is-danger { background: var(--lkl-danger-bg); border-color: var(--lkl-danger-border); color: var(--lkl-danger); }
+
+/* ---- Tables ---------------------------------------------------------------
+   Data tables stay deliberately flat: no blur per row (expensive), no radii
+   per cell. The container carries the material, the table carries the data. */
+.lkl-table-wrap { overflow-x: auto; }
+table.lkl-table { width: 100%; border-collapse: collapse; font-size: var(--lkl-fs-md); }
+table.lkl-table th {
+  text-align: left; font-family: var(--lkl-font); font-size: var(--lkl-fs-xs);
+  text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
+  color: var(--lkl-text-3); border-bottom: 2px solid var(--lkl-border);
+  padding: var(--lkl-space-2) var(--lkl-space-3); white-space: nowrap;
+}
+table.lkl-table td {
+  padding: var(--lkl-space-2) var(--lkl-space-3);
+  border-bottom: 1px solid var(--lkl-border);
+  font-variant-numeric: tabular-nums;
+}
+table.lkl-table tr:last-child td { border-bottom: none; }
+table.lkl-table tr.is-warn td   { background: var(--lkl-warn-bg);   color: var(--lkl-warn); }
+table.lkl-table tr.is-danger td { background: var(--lkl-danger-bg); color: var(--lkl-danger); }
+
+/* ---- Code / formula box ---------------------------------------------------- */
+.lkl-code {
+  font-family: var(--lkl-font-mono);
+  font-size: var(--lkl-fs-sm);
+  line-height: 1.9;
+  color: var(--lkl-text-2);
+  background: var(--lkl-field);
+  border: 1px solid var(--lkl-border);
+  border-radius: var(--lkl-radius-sm);
+  padding: var(--lkl-space-3) var(--lkl-space-4);
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+}
+.lkl-code b { color: var(--lkl-text); font-weight: 600; }
+
+/* ---- Timeline step (from the topics prototype) ----------------------------- */
+.lkl-step {
+  display: flex; align-items: center; gap: var(--lkl-space-4);
+  padding: var(--lkl-space-3) var(--lkl-space-4);
+  border-radius: var(--lkl-radius);
+  background: var(--lkl-surface);
+  border: 1px solid var(--lkl-border);
+  box-shadow: var(--lkl-inset);
+  backdrop-filter: var(--lkl-blur);
+  -webkit-backdrop-filter: var(--lkl-blur);
+}
+.lkl-step.is-variant { border-style: dashed; opacity: .8; }
+.lkl-step.is-current { border-color: var(--lkl-accent-border); box-shadow: var(--lkl-shadow-card), var(--lkl-inset); }
+.lkl-step.is-pending { border-style: dashed; border-color: var(--lkl-warn-border); background: var(--lkl-warn-bg); }
+.lkl-step-badge {
+  flex-shrink: 0; min-width: 56px; text-align: center;
+  font-size: var(--lkl-fs-sm); font-weight: 600;
+  padding: var(--lkl-space-1) var(--lkl-space-3);
+  border-radius: var(--lkl-radius-pill);
+  background: var(--lkl-surface-2); border: 1px solid var(--lkl-border);
+  color: var(--lkl-text-2);
+}
+.lkl-step.is-current .lkl-step-badge { background: var(--lkl-accent-bg); border-color: var(--lkl-accent-border); color: var(--lkl-accent); }
+.lkl-step-body { flex: 1; font-size: var(--lkl-fs-base); min-width: 0; }
+
+/* ---- Title bar (window metaphor) ------------------------------------------- */
+.lkl-titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--lkl-space-3) var(--lkl-space-5);
+  border-bottom: 1px solid var(--lkl-border);
+}
+.lkl-titlebar-title { font-size: var(--lkl-fs-base); font-weight: 600; }
+.lkl-dots { display: flex; gap: 5px; }
+.lkl-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--lkl-text-3); opacity: .5; display: block; }
+
+
+/* =============================================================================
+   6  PRINT
+   Glass does not exist in print — backdrop-filter is ignored and gradients eat
+   toner. The print context therefore forces paper on white, regardless of
+   data-theme and data-skin.
+   ============================================================================= */
+@media print {
+  :root, [data-theme], [data-skin] {
+    --lkl-surface: #fff; --lkl-surface-2: #fff; --lkl-shell: #fff; --lkl-field: #fff;
+    --lkl-border: #bbb; --lkl-border-glow: transparent;
+    --lkl-text: #000; --lkl-text-2: #333; --lkl-text-3: #555;
+    --lkl-blur: none;
+    --lkl-shadow: 0 0 0 rgba(0,0,0,0); --lkl-inset: inset 0 0 0 rgba(0,0,0,0);
+    --lkl-bg-a: #fff; --lkl-bg-b: #fff;
+    color-scheme: light;
+  }
+  body { background: #fff; }
+  body::before { display: none; }
+  .lkl-shell, .lkl-card, .lkl-stat, .lkl-step { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .lkl-no-print { display: none !important; }
+}
+
+
+/* =============================================================================
+   7  MOTION
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
