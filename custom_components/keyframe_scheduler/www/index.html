@@ -4,406 +4,207 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Keyframe Scheduler - Lichtsteuerung</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="styleguide/lkl-theme.css">
+  <!-- Before paint, otherwise the wrong theme flashes briefly. -->
+  <script src="styleguide/lkl-theme.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    /* App-specific layout on top of the LKL UI style guide.
+       RULE: no colour literals here, only --lkl-* tokens. */
 
-    :root {
-      --bg-primary: #ffffff;
-      --bg-secondary: #f5f5f5;
-      --bg-card: #ffffff;
-      --text-primary: #1a1a1a;
-      --text-secondary: #666666;
-      --border: #e0e0e0;
-      --accent: #2196F3;
-      --accent-hover: #1976D2;
-      --danger: #f44336;
-      --success: #4CAF50;
-      --warning: #ff9800;
-      --shadow: 0 2px 8px rgba(0,0,0,0.1);
-      --radius: 8px;
-    }
+    p, h1, h2 { margin: 0; }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-primary: #1a1a1a;
-        --bg-secondary: #2a2a2a;
-        --bg-card: #2a2a2a;
-        --text-primary: #ffffff;
-        --text-secondary: #b0b0b0;
-        --border: #404040;
-        --shadow: 0 2px 8px rgba(0,0,0,0.5);
-      }
-    }
+    body { padding: var(--lkl-space-5); }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.6;
-      padding: 20px;
-    }
-
-    .container {
+    .app {
       max-width: 1400px;
       margin: 0 auto;
-    }
-
-    header {
-      margin-bottom: 30px;
-    }
-
-    h1 {
-      font-size: 28px;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: var(--shadow);
-    }
-
-    .card-title {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-title-icon {
-      font-size: 20px;
-    }
-
-    .grid {
-      display: grid;
-      gap: 16px;
-    }
-
-    .grid-2 {
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    }
-
-    .grid-3 {
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
-
-    .form-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: var(--lkl-space-4);
     }
 
-    label {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-
-    input, select, button {
-      font-family: inherit;
-      font-size: 14px;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      outline: none;
-      transition: all 0.2s;
-    }
-
-    input:focus, select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-    }
-
-    button {
-      cursor: pointer;
-      background: var(--accent);
-      color: white;
-      border: none;
-      font-weight: 500;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      justify-content: center;
-    }
-
-    button:hover {
-      background: var(--accent-hover);
-    }
-
-    button.secondary {
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-    }
-
-    button.secondary:hover {
-      background: var(--border);
-    }
-
-    button.danger {
-      background: var(--danger);
-    }
-
-    button.success {
-      background: var(--success);
-    }
-
-    button.small {
-      padding: 6px 10px;
-      font-size: 13px;
-    }
-
-    .btn-group {
+    /* ---- Header ------------------------------------------------------------ */
+    .app-header {
       display: flex;
-      gap: 10px;
+      justify-content: space-between;
+      align-items: flex-end;
       flex-wrap: wrap;
+      gap: var(--lkl-space-4);
+      padding-bottom: var(--lkl-space-2);
     }
+    .app-header .lkl-sub { margin-top: var(--lkl-space-1); }
 
-    .keyframes-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 16px;
+    .app-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--lkl-space-4);
     }
-
-    .keyframes-table th {
-      text-align: left;
-      font-weight: 600;
-      font-size: 12px;
-      color: var(--text-secondary);
-      padding: 12px 8px;
-      border-bottom: 2px solid var(--border);
+    .control-group { display: flex; align-items: center; gap: var(--lkl-space-1); }
+    .control-group-label {
+      font-size: var(--lkl-fs-xs);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: .06em;
+      color: var(--lkl-text-3);
+      margin-right: var(--lkl-space-1);
+    }
+    .lkl-chip.is-compact { padding: var(--lkl-space-1) var(--lkl-space-3); font-size: var(--lkl-fs-sm); }
+
+    /* ---- Cards --------------------------------------------------------------- */
+    .card-head { margin-bottom: var(--lkl-space-4); }
+    .card-head .lkl-h2 { margin: 0; }
+
+    .grid-3 {
+      display: grid;
+      gap: var(--lkl-space-4);
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     }
 
-    .keyframes-table td {
-      padding: 12px 8px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
+    .field { display: flex; flex-direction: column; }
+    .field + .grid-3 { margin-top: var(--lkl-space-4); }
+    .field-help {
+      display: block;
+      font-size: var(--lkl-fs-sm);
+      line-height: var(--lkl-lh-tight);
+      color: var(--lkl-text-3);
+      margin-top: var(--lkl-space-1);
+    }
+    .field-help strong { color: var(--lkl-text-2); }
+
+    /* Mono is for numbers only — free text gets the body face. */
+    .lkl-input.is-text { font-family: var(--lkl-font); }
+    .lkl-input.is-lg { font-size: var(--lkl-fs-lg); font-weight: 600; }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: var(--lkl-space-2); }
+    .spaced { margin-top: var(--lkl-space-4); }
+
+    .lkl-btn.is-small { padding: var(--lkl-space-1) var(--lkl-space-2); }
+    .lkl-btn.is-danger:hover {
+      color: var(--lkl-danger);
+      border-color: var(--lkl-danger-border);
+      background: var(--lkl-danger-bg);
     }
 
-    .keyframes-table tr:hover {
-      background: var(--bg-secondary);
+    /* ---- Banners ------------------------------------------------------------- */
+    .lkl-banner { line-height: var(--lkl-lh-base); }
+    .lkl-banner strong { color: var(--lkl-text); font-weight: 600; }
+    .lkl-banner code {
+      font-family: var(--lkl-font-mono);
+      font-size: var(--lkl-fs-sm);
+      padding: 1px var(--lkl-space-2);
+      border: 1px solid var(--lkl-border);
+      border-radius: var(--lkl-radius-sm);
+      background: var(--lkl-field);
+      color: var(--lkl-text);
     }
+    .lkl-banner .lkl-pill { margin: 2px var(--lkl-space-1) 2px 0; }
 
-    .keyframes-table input,
-    .keyframes-table select {
-      width: 100%;
-      padding: 6px 8px;
-      font-size: 13px;
-    }
+    /* ---- Keyframe table ------------------------------------------------------ */
+    .keyframes-table td { vertical-align: middle; }
+    .keyframes-table tbody tr { transition: opacity var(--lkl-dur); }
+    .keyframes-table tbody tr:hover td { background: var(--lkl-surface-2); }
+    .keyframes-table tbody tr.is-dragging { opacity: .5; }
 
-    .keyframes-table input[type="number"] {
-      width: 80px;
+    .keyframes-table .lkl-input,
+    .keyframes-table .lkl-select {
+      padding: var(--lkl-space-1) var(--lkl-space-2);
+      font-size: var(--lkl-fs-md);
     }
+    .keyframes-table input[type="time"]   { width: 104px; }
+    .keyframes-table input[type="number"] { width: 84px; }
+    .keyframes-table .hms input[type="number"] { width: 52px; }
+    .keyframes-table .lkl-select { width: auto; min-width: 100px; }
 
-    .keyframes-table input[type="time"] {
-      width: 100px;
-    }
+    .keyframes-table td.is-inactive > * { opacity: .35; }
+
+    .hms { display: flex; gap: var(--lkl-space-1); align-items: center; }
+    .hms-sep { color: var(--lkl-text-3); }
 
     .drag-handle {
       cursor: grab;
-      font-size: 18px;
-      color: var(--text-secondary);
+      font-size: var(--lkl-fs-lg);
+      color: var(--lkl-text-3);
       user-select: none;
     }
+    .drag-handle:active { cursor: grabbing; }
 
-    .drag-handle:active {
-      cursor: grabbing;
-    }
-
-    .row-number {
-      font-weight: 600;
-      color: var(--text-secondary);
-      font-size: 13px;
-    }
-
-    .chart-container {
-      position: relative;
-      height: 400px;
-      margin-top: 16px;
-    }
-
-    canvas {
-      max-height: 100%;
-    }
-
-    .info-box {
-      background: var(--bg-secondary);
-      border-left: 4px solid var(--accent);
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      line-height: 1.6;
-      margin-top: 16px;
-    }
-
-    .info-box.warning {
-      border-left-color: var(--warning);
-    }
-
-    .info-box strong {
-      font-weight: 600;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .badge.instant {
-      background: #e3f2fd;
-      color: #1565c0;
-    }
-
-    .badge.transition {
-      background: #f3e5f5;
-      color: #6a1b9a;
-    }
-
-    .badge.interpolate {
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .badge.instant {
-        background: #1565c0;
-        color: #e3f2fd;
-      }
-      .badge.transition {
-        background: #6a1b9a;
-        color: #f3e5f5;
-      }
-      .badge.interpolate {
-        background: #2e7d32;
-        color: #e8f5e9;
-      }
-    }
+    .row-number { font-family: var(--lkl-font-mono); color: var(--lkl-text-3); }
 
     .empty-state {
       text-align: center;
-      padding: 60px 20px;
-      color: var(--text-secondary);
+      padding: var(--lkl-space-6) var(--lkl-space-4);
+      color: var(--lkl-text-3);
     }
 
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.5;
+    /* ---- Chart & stats ------------------------------------------------------- */
+    .chart-container { position: relative; height: 400px; }
+    canvas { max-height: 100%; }
+
+    .stat-grid {
+      display: grid;
+      gap: var(--lkl-space-3);
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
 
-    details {
-      margin-top: 16px;
-    }
-
+    /* ---- JSON editor --------------------------------------------------------- */
+    details { margin-top: var(--lkl-space-4); }
     summary {
       cursor: pointer;
-      font-weight: 600;
-      padding: 10px;
-      background: var(--bg-secondary);
-      border-radius: var(--radius);
       user-select: none;
+      font-size: var(--lkl-fs-md);
+      font-weight: 600;
+      color: var(--lkl-text-2);
+      padding: var(--lkl-space-2) 0;
+      transition: color var(--lkl-dur);
     }
-
-    summary:hover {
-      background: var(--border);
-    }
+    summary:hover { color: var(--lkl-accent); }
 
     .json-box {
+      display: block;
       width: 100%;
-      min-height: 200px;
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      font-size: 12px;
-      padding: 12px;
-      margin-top: 12px;
+      min-height: 240px;
+      margin-top: var(--lkl-space-2);
+      line-height: var(--lkl-lh-base);
+      color: var(--lkl-text);
       resize: vertical;
-      background: var(--bg-secondary);
+      outline: none;
     }
-
-    .stats {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-
-    .stat-item {
-      display: flex;
-      gap: 6px;
-    }
-
-    .stat-label {
-      font-weight: 600;
-    }
+    .json-box:focus { border-color: var(--lkl-accent); box-shadow: 0 0 0 3px var(--lkl-focus); }
 
     @media (max-width: 768px) {
-      .grid-2, .grid-3 {
-        grid-template-columns: 1fr;
-      }
-
-      .keyframes-table {
-        font-size: 12px;
-      }
-
-      .keyframes-table th,
-      .keyframes-table td {
-        padding: 8px 4px;
-      }
-    }
-
-    .mode-help {
-      font-size: 12px;
-      color: var(--text-secondary);
-      margin-top: 4px;
-      line-height: 1.4;
+      body { padding: var(--lkl-space-3); }
+      .grid-3 { grid-template-columns: 1fr; }
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-        <div>
-          <h1>🌅 Keyframe Scheduler</h1>
-          <p class="subtitle" id="subtitle-text">Erstelle dynamische Lichtsteuerung mit Farbtemperatur und Helligkeit</p>
+  <div class="app">
+    <header class="app-header">
+      <div>
+        <h1 class="lkl-h1">Keyframe Scheduler</h1>
+        <p class="lkl-sub" id="subtitle-text">Erstelle dynamische Lichtsteuerung mit Farbtemperatur und Helligkeit</p>
+      </div>
+      <div class="app-controls">
+        <div class="control-group">
+          <span class="control-group-label" id="label-theme">Hell/Dunkel</span>
+          <button class="lkl-chip is-compact" data-theme-k="theme" data-theme-v="day" id="themeDay">Tag</button>
+          <button class="lkl-chip is-compact" data-theme-k="theme" data-theme-v="night" id="themeNight">Nacht</button>
+          <button class="lkl-chip is-compact" data-theme-k="theme" data-theme-v="auto" id="themeAuto">Auto</button>
         </div>
-        <div class="btn-group" style="margin: 0;">
-          <button id="langDe" class="success" style="padding: 8px 16px;" onclick="setLanguage('de')">
-            DE
-          </button>
-          <button id="langEn" class="secondary" style="padding: 8px 16px;" onclick="setLanguage('en')">
-            EN
-          </button>
-          <button id="langEs" class="secondary" style="padding: 8px 16px;" onclick="setLanguage('es')">
-            ES
-          </button>
+        <div class="control-group">
+          <span class="control-group-label" id="label-skin">Stil</span>
+          <button class="lkl-chip is-compact" data-theme-k="skin" data-theme-v="glass" id="skinGlass">Glas</button>
+          <button class="lkl-chip is-compact" data-theme-k="skin" data-theme-v="paper" id="skinPaper">Papier</button>
+        </div>
+        <div class="control-group">
+          <button id="langDe" class="lkl-chip is-compact is-active" onclick="setLanguage('de')">DE</button>
+          <button id="langEn" class="lkl-chip is-compact" onclick="setLanguage('en')">EN</button>
+          <button id="langEs" class="lkl-chip is-compact" onclick="setLanguage('es')">ES</button>
         </div>
       </div>
     </header>
@@ -414,7 +215,7 @@
       // For local files, replace the current filename
       const current = window.location.href;
       const lastSlash = current.lastIndexOf('/');
-      const lastBackslash = current.lastIndexOf('\\');
+      const lastBackslash = current.lastIndexOf('\');
       const sep = Math.max(lastSlash, lastBackslash);
       if (sep > 0) {
         window.location.href = current.substring(0, sep + 1) + filename;
@@ -425,138 +226,119 @@
     </script>
 
     <!-- Settings Card -->
-    <div class="card">
-      <div class="card-title">
-        <span class="card-title-icon">⚙️</span>
-        <span id="card-title-settings">Einstellungen</span>
+    <section class="lkl-card">
+      <div class="card-head">
+        <h2 class="lkl-h2" id="card-title-settings">Einstellungen</h2>
       </div>
-      
+
       <!-- Schedule Name -->
-      <div class="form-group" style="margin-bottom: 20px;">
-        <label for="scheduleName" id="label-schedule-name">Schedule Name</label>
-        <input type="text" id="scheduleName" value="My Schedule" 
+      <div class="field">
+        <label class="lkl-label" for="scheduleName" id="label-schedule-name">Schedule Name</label>
+        <input class="lkl-input is-text is-lg" type="text" id="scheduleName" value="My Schedule"
                placeholder="My Schedule"
                maxlength="50"
-               oninput="updateScheduleName(this.value)"
-               style="font-size: 16px; font-weight: 500;">
-        <small id="help-schedule-name" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">
+               oninput="updateScheduleName(this.value)">
+        <small class="field-help" id="help-schedule-name">
           Wird für JSON-Dateinamen und PDF-Titel verwendet
         </small>
       </div>
-      
-      <div class="grid grid-3">
-        <div class="form-group">
-          <label for="stepMinutes" id="label-step-minutes">Aktualisierung (Minuten)</label>
-          <input type="number" id="stepMinutes" min="1" max="60" value="5">
-          <small id="help-step-minutes" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block; line-height: 1.4;"><!-- Filled by updateHelpTexts() --></small>
+
+      <div class="grid-3">
+        <div class="field">
+          <label class="lkl-label" for="stepMinutes" id="label-step-minutes">Aktualisierung (Minuten)</label>
+          <input class="lkl-input" type="number" id="stepMinutes" min="1" max="60" value="5">
+          <small class="field-help" id="help-step-minutes"><!-- Filled by updateHelpTexts() --></small>
         </div>
 
-        <div class="form-group">
-          <label for="horizonHours" id="label-horizon-hours">Vorschau-Zeitraum</label>
-          <select id="horizonHours">
+        <div class="field">
+          <label class="lkl-label" for="horizonHours" id="label-horizon-hours">Vorschau-Zeitraum</label>
+          <select class="lkl-select" id="horizonHours">
             <option value="24" id="opt-24h">24 Stunden</option>
             <option value="48" selected id="opt-48h">48 Stunden</option>
             <option value="72" id="opt-72h">72 Stunden</option>
           </select>
         </div>
 
-        <div class="form-group">
-          <label for="wrapAround" id="label-wrap-around">Wiederholung</label>
-          <select id="wrapAround">
+        <div class="field">
+          <label class="lkl-label" for="wrapAround" id="label-wrap-around">Wiederholung</label>
+          <select class="lkl-select" id="wrapAround">
             <option value="true" selected id="opt-repeat-daily">Täglich wiederholen</option>
             <option value="false" id="opt-repeat-once">Einmalig</option>
           </select>
         </div>
       </div>
 
-      <div class="info-box" id="keyframe-tip" style="margin-top: 16px;"><!-- Filled by updateTip() --></div>
-    </div>
+      <div class="lkl-banner spaced" id="keyframe-tip"><!-- Filled by updateTip() --></div>
+    </section>
 
     <!-- Keyframes Card -->
-    <div class="card">
-      <div class="card-title">
-        <span class="card-title-icon">⏱️</span>
-        <span id="card-title-keyframes">Keyframes</span>
+    <section class="lkl-card">
+      <div class="card-head">
+        <h2 class="lkl-h2" id="card-title-keyframes">Keyframes</h2>
       </div>
 
-      <div class="btn-group">
-        <button id="addKeyframeBtn">
-          ➕ Keyframe hinzufügen
-        </button>
-        <button class="secondary" id="sortByTimeBtn">
-          🔄 Nach Zeit sortieren
-        </button>
-        <button class="secondary" id="loadPresetBtn">
-          📋 Beispiel laden
-        </button>
-        <button class="secondary" id="loadFileBtn">
-          📂 Datei laden
-        </button>
+      <div class="btn-row">
+        <button class="lkl-btn is-primary" id="addKeyframeBtn">Keyframe hinzufügen</button>
+        <button class="lkl-btn" id="sortByTimeBtn">Nach Zeit sortieren</button>
+        <button class="lkl-btn" id="loadPresetBtn">Beispiel laden</button>
+        <button class="lkl-btn" id="loadFileBtn">Datei laden</button>
       </div>
-      <input type="file" id="fileInputTop" accept=".json" style="display: none;">
+      <input type="file" id="fileInputTop" accept=".json" hidden>
 
-      <div id="keyframesContainer">
+      <div id="keyframesContainer" class="spaced">
         <!-- Table will be inserted here -->
       </div>
 
-      <div class="info-box" id="info-box">
+      <div class="lkl-banner spaced" id="info-box">
         <!-- Will be populated by updateInfoBox() -->
       </div>
-    </div>
+    </section>
 
     <!-- Chart Card -->
-    <div class="card">
-      <div class="card-title">
-        <span class="card-title-icon">📊</span>
-        <span id="card-title-preview">Vorschau</span>
+    <section class="lkl-card">
+      <div class="card-head">
+        <h2 class="lkl-h2" id="card-title-preview">Vorschau</h2>
       </div>
 
       <div class="chart-container">
         <canvas id="chart"></canvas>
       </div>
 
-      <div class="stats" id="stats">
+      <div class="stat-grid spaced" id="stats">
         <!-- Stats will be inserted here -->
       </div>
 
-      <div class="btn-group" style="margin-top: 16px;">
-        <button class="secondary" id="downloadCsvBtn">
-          📊 CSV Export
-        </button>
+      <div class="btn-row spaced">
+        <button class="lkl-btn" id="downloadCsvBtn">CSV Export</button>
       </div>
-    </div>
+    </section>
 
     <!-- Export/Import Card -->
-    <div class="card">
-      <div class="card-title">
-        <span class="card-title-icon">💾</span>
-        <span id="card-title-export">Export & Import</span>
+    <section class="lkl-card">
+      <div class="card-head">
+        <h2 class="lkl-h2" id="card-title-export">Export & Import</h2>
       </div>
 
-      <div class="btn-group">
-        <button class="success" id="downloadJsonBtn">
-          ⬇️ Als Datei speichern
-        </button>
-        <button class="secondary" id="downloadPdfBtn">
-          📄 PDF Export
-        </button>
+      <div class="btn-row">
+        <button class="lkl-btn is-primary" id="downloadJsonBtn">Als Datei speichern</button>
+        <button class="lkl-btn" id="downloadPdfBtn">PDF Export</button>
       </div>
-      <input type="file" id="fileInput" accept=".json" style="display: none;">
+      <input type="file" id="fileInput" accept=".json" hidden>
 
       <details>
         <summary id="json-summary">JSON anzeigen/bearbeiten</summary>
-        <textarea id="jsonOutput" class="json-box" readonly></textarea>
-        <div class="btn-group" style="margin-top: 12px;">
-          <button class="small secondary" id="importFromTextBtn">
-            <span id="btn-import-json">⬅️ JSON übernehmen</span>
+        <textarea id="jsonOutput" class="lkl-code json-box" readonly></textarea>
+        <div class="btn-row spaced">
+          <button class="lkl-btn is-small" id="importFromTextBtn">
+            <span id="btn-import-json">JSON übernehmen</span>
           </button>
         </div>
       </details>
-      
-      <div id="workflow-box" style="background: #d1ecf1; border: 1px solid #0c5460; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px;">
+
+      <div class="lkl-banner spaced" id="workflow-box">
         <!-- Will be populated by updateWorkflowBox() -->
       </div>
-    </div>
+    </section>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -618,6 +400,13 @@ const translations = {
   de: {
     // Header
     subtitle: "Erstelle dynamische Lichtsteuerung mit Farbtemperatur und Helligkeit",
+    theme_label: "Hell/Dunkel",
+    theme_day: "Tag",
+    theme_night: "Nacht",
+    theme_auto: "Auto",
+    skin_label: "Stil",
+    skin_glass: "Glas",
+    skin_paper: "Papier",
     
     // Card titles
     settings: "Einstellungen",
@@ -633,15 +422,15 @@ const translations = {
     wrap_around_label: "Wiederholung",
     
     // Buttons
-    add_keyframe: "➕ Keyframe hinzufügen",
-    sort_by_time: "🔄 Nach Zeit sortieren",
-    load_example: "📋 Beispiel laden",
-    load_file: "📂 Datei laden",
-    save_file: "⬇️ Als Datei speichern",
-    pdf_export: "📄 PDF Export",
-    csv_export: "📊 CSV Export",
+    add_keyframe: "Keyframe hinzufügen",
+    sort_by_time: "Nach Zeit sortieren",
+    load_example: "Beispiel laden",
+    load_file: "Datei laden",
+    save_file: "Als Datei speichern",
+    pdf_export: "PDF Export",
+    csv_export: "CSV Export",
     show_json: "JSON anzeigen/bearbeiten",
-    import_text: "⬅️ JSON übernehmen",
+    import_text: "JSON übernehmen",
     
     // Table headers
     th_time: "ZEIT",
@@ -674,15 +463,15 @@ const translations = {
     info_transition_curve: "Kurve: Linear (gleichmäßig) oder Sinus (sanfter Start/Ende)",
     info_interpolate: "Durchgehende Interpolation vom vorherigen Keyframe",
     info_interpolate_curve: "Kurve: Linear oder Sinus für den gesamten Übergang",
-    info_transition_time: "💡 Transition-Zeit:",
+    info_transition_time: "Transition-Zeit:",
     info_interpolate_time: "Verwendet automatisch die Aktualisierungszeit (z.B. 5 Min = 0:05:00)",
     info_transition_any: "Beliebige Zeit möglich (z.B. 0:00:30 für DALI, 0:30:00 für lange Übergänge)",
     
     // Workflow
-    workflow_title: "📋 Workflow für Home Assistant:",
+    workflow_title: "Workflow für Home Assistant:",
     workflow_step1: "klicken → JSON-Datei herunterladen",
     workflow_step2: "JSON-Datei hochladen → Senden",
-    workflow_step3: "⚠️ <strong>Integration neu laden!</strong>",
+    workflow_step3: "<strong>Integration neu laden!</strong>",
     workflow_step3_detail: "Menü → Integration neu laden",
     
     // Chart
@@ -738,13 +527,20 @@ const translations = {
     help_example: "Beispiel:",
     help_transition_note: "(Aktualisierung × 60) Sekunden",
     help_transition_example: "5 Minuten = 300s Transition (außer im Keyframe kürzer angegeben)",
-    tip_title: "💡 Tipp:",
+    tip_title: "Tipp:",
     tip_text: "Die Reihenfolge der Keyframes bestimmt ihre Priorität bei Überschneidungen. Verwende das ⋮⋮ Symbol zum Verschieben."
   },
   
   en: {
     // Header
     subtitle: "Create dynamic light control with color temperature and brightness",
+    theme_label: "Brightness",
+    theme_day: "Day",
+    theme_night: "Night",
+    theme_auto: "Auto",
+    skin_label: "Style",
+    skin_glass: "Glass",
+    skin_paper: "Paper",
     
     // Card titles
     settings: "Settings",
@@ -760,15 +556,15 @@ const translations = {
     wrap_around_label: "24h Repeat",
     
     // Buttons
-    add_keyframe: "➕ Add Keyframe",
-    sort_by_time: "🔄 Sort by Time",
-    load_example: "📋 Load Example",
-    load_file: "📂 Load File",
-    save_file: "⬇️ Save as File",
-    pdf_export: "📄 PDF Export",
-    csv_export: "📊 CSV Export",
+    add_keyframe: "Add Keyframe",
+    sort_by_time: "Sort by Time",
+    load_example: "Load Example",
+    load_file: "Load File",
+    save_file: "Save as File",
+    pdf_export: "PDF Export",
+    csv_export: "CSV Export",
     show_json: "Show/Edit JSON",
-    import_text: "⬅️ Import JSON",
+    import_text: "Import JSON",
     
     // Table headers
     th_time: "TIME",
@@ -801,15 +597,15 @@ const translations = {
     info_transition_curve: "Curve: Linear (uniform) or Sine (smooth start/end)",
     info_interpolate: "Continuous interpolation from previous keyframe",
     info_interpolate_curve: "Curve: Linear or Sine for entire transition",
-    info_transition_time: "💡 Transition Time:",
+    info_transition_time: "Transition Time:",
     info_interpolate_time: "Automatically uses update time (e.g. 5 min = 0:05:00)",
     info_transition_any: "Any time possible (e.g. 0:00:30 for DALI, 0:30:00 for long transitions)",
     
     // Workflow
-    workflow_title: "📋 Workflow for Home Assistant:",
+    workflow_title: "Workflow for Home Assistant:",
     workflow_step1: "click → Download JSON file",
     workflow_step2: "Upload JSON file → Send",
-    workflow_step3: "⚠️ <strong>Reload Integration!</strong>",
+    workflow_step3: "<strong>Reload Integration!</strong>",
     workflow_step3_detail: "Menu → Reload Integration",
     
     // Chart
@@ -865,13 +661,20 @@ const translations = {
     help_example: "Example:",
     help_transition_note: "(Update Interval × 60) seconds",
     help_transition_example: "5 minutes = 300s transition (unless shorter specified in keyframe)",
-    tip_title: "💡 Tip:",
+    tip_title: "Tip:",
     tip_text: "The order of keyframes determines their priority when overlapping. Use the ⋮⋮ symbol to reorder."
   },
   
   es: {
     // Header
     subtitle: "Crea control de iluminación dinámico con temperatura de color y brillo",
+    theme_label: "Brillo",
+    theme_day: "Día",
+    theme_night: "Noche",
+    theme_auto: "Auto",
+    skin_label: "Estilo",
+    skin_glass: "Vidrio",
+    skin_paper: "Papel",
     
     // Card titles
     settings: "Configuración",
@@ -887,15 +690,15 @@ const translations = {
     wrap_around_label: "Repetición 24h",
     
     // Buttons
-    add_keyframe: "➕ Añadir Keyframe",
-    sort_by_time: "🔄 Ordenar por Tiempo",
-    load_example: "📋 Cargar Ejemplo",
-    load_file: "📂 Cargar Archivo",
-    save_file: "⬇️ Guardar como Archivo",
-    pdf_export: "📄 Exportar PDF",
-    csv_export: "📊 Exportar CSV",
+    add_keyframe: "Añadir Keyframe",
+    sort_by_time: "Ordenar por Tiempo",
+    load_example: "Cargar Ejemplo",
+    load_file: "Cargar Archivo",
+    save_file: "Guardar como Archivo",
+    pdf_export: "Exportar PDF",
+    csv_export: "Exportar CSV",
     show_json: "Mostrar/Editar JSON",
-    import_text: "⬅️ Importar JSON",
+    import_text: "Importar JSON",
     
     // Table headers
     th_time: "TIEMPO",
@@ -928,15 +731,15 @@ const translations = {
     info_transition_curve: "Curva: Lineal (uniforme) o Sinusoidal (inicio/fin suave)",
     info_interpolate: "Interpolación continua desde el keyframe anterior",
     info_interpolate_curve: "Curva: Lineal o Sinusoidal para toda la transición",
-    info_transition_time: "💡 Tiempo de Transición:",
+    info_transition_time: "Tiempo de Transición:",
     info_interpolate_time: "Usa automáticamente el tiempo de actualización (ej. 5 min = 0:05:00)",
     info_transition_any: "Cualquier tiempo posible (ej. 0:00:30 para DALI, 0:30:00 para transiciones largas)",
     
     // Workflow
-    workflow_title: "📋 Flujo de Trabajo para Home Assistant:",
+    workflow_title: "Flujo de Trabajo para Home Assistant:",
     workflow_step1: "hacer clic → Descargar archivo JSON",
     workflow_step2: "Subir archivo JSON → Enviar",
-    workflow_step3: "⚠️ <strong>¡Recargar Integración!</strong>",
+    workflow_step3: "<strong>¡Recargar Integración!</strong>",
     workflow_step3_detail: "Menú → Recargar Integración",
     
     // Chart
@@ -992,7 +795,7 @@ const translations = {
     help_example: "Ejemplo:",
     help_transition_note: "(Intervalo de Actualización × 60) segundos",
     help_transition_example: "5 minutos = 300s transición (a menos que se especifique más corto en el keyframe)",
-    tip_title: "💡 Consejo:",
+    tip_title: "Consejo:",
     tip_text: "El orden de los keyframes determina su prioridad cuando se superponen. Usa el símbolo ⋮⋮ para reordenar."
 
   }
@@ -1011,12 +814,12 @@ const translations = {
       
       infoBox.innerHTML = `
         <strong>${t('info_modes_title')}</strong><br>
-        <span class="badge instant">${t('mode_instant')}</span> ${t('info_instant')}<br>
-        <span class="badge transition">${t('mode_transition')}</span> ${t('info_transition')}<br>
+        <span class="lkl-pill">${t('mode_instant')}</span> ${t('info_instant')}<br>
+        <span class="lkl-pill">${t('mode_transition')}</span> ${t('info_transition')}<br>
         • <strong>${t('dir_after')}</strong>: ${t('info_transition_after')}<br>
         • <strong>${t('dir_before')}</strong>: ${t('info_transition_before')}<br>
         • <strong>${t('pdf_curve')}</strong>: ${t('info_transition_curve')}<br>
-        <span class="badge interpolate">${t('mode_interpolate')}</span> ${t('info_interpolate')}<br>
+        <span class="lkl-pill">${t('mode_interpolate')}</span> ${t('info_interpolate')}<br>
         • <strong>${t('pdf_curve')}</strong>: ${t('info_interpolate_curve')}<br>
         <br>
         <strong>${t('info_transition_time')}</strong><br>
@@ -1032,9 +835,9 @@ const translations = {
       workflowBox.innerHTML = `
         <strong>${t('workflow_title')}</strong><br>
         1. <strong>"${t('save_file')}"</strong> ${t('workflow_step1')}<br>
-        2. In HA: <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 3px;">${t('settings')} → Keyframe Scheduler → Options</code><br>
+        2. In HA: <code>${t('settings')} → Keyframe Scheduler → Options</code><br>
         3. <strong>${t('workflow_step2')}</strong><br>
-        4. ${t('workflow_step3')} <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 3px;">⋮ ${t('workflow_step3_detail')}</code>
+        4. ${t('workflow_step3')} <code>⋮ ${t('workflow_step3_detail')}</code>
       `;
     }
     
@@ -1084,6 +887,15 @@ const translations = {
       document.getElementById('card-title-preview').textContent = t('preview');
       document.getElementById('card-title-export').textContent = t('export_import');
       
+      // Update theme controls
+      document.getElementById('label-theme').textContent = t('theme_label');
+      document.getElementById('themeDay').textContent = t('theme_day');
+      document.getElementById('themeNight').textContent = t('theme_night');
+      document.getElementById('themeAuto').textContent = t('theme_auto');
+      document.getElementById('label-skin').textContent = t('skin_label');
+      document.getElementById('skinGlass').textContent = t('skin_glass');
+      document.getElementById('skinPaper').textContent = t('skin_paper');
+
       // Update settings labels
       const labelScheduleName = document.getElementById('label-schedule-name');
       const labelStepMinutes = document.getElementById('label-step-minutes');
@@ -1134,9 +946,7 @@ const translations = {
       // Update language buttons
       ['De', 'En', 'Es'].forEach(l => {
         const btn = document.getElementById('lang' + l);
-        const isActive = l.toLowerCase() === lang;
-        btn.classList.toggle('success', isActive);
-        btn.classList.toggle('secondary', !isActive);
+        btn.classList.toggle('is-active', l.toLowerCase() === lang);
       });
       
       // Update subtitle
@@ -1309,7 +1119,6 @@ const translations = {
       if (state.keyframes.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">⏱️</div>
             <p>${t('empty_message')}</p>
           </div>
         `;
@@ -1317,7 +1126,8 @@ const translations = {
       }
 
       let html = `
-        <table class="keyframes-table">
+        <div class="lkl-table-wrap">
+        <table class="lkl-table keyframes-table">
           <thead>
             <tr>
               <th style="width: 40px;"></th>
@@ -1344,71 +1154,72 @@ const translations = {
             <td><span class="drag-handle">⋮⋮</span></td>
             <td><span class="row-number">${index + 1}</span></td>
             <td>
-              <input type="time" value="${kf.time}" 
+              <input class="lkl-input" type="time" value="${kf.time}"
                      oninput="updateKeyframe(${index}, 'time', this.value)">
             </td>
             <td>
-              <input type="number" min="2000" max="6500" step="100" 
+              <input class="lkl-input" type="number" min="2000" max="6500" step="100"
                      value="${kf.kelvin}"
                      oninput="updateKeyframe(${index}, 'kelvin', this.value)">
             </td>
             <td>
-              <input type="number" min="0" max="100" step="5" 
+              <input class="lkl-input" type="number" min="0" max="100" step="5"
                      value="${kf.dim}"
                      oninput="updateKeyframe(${index}, 'dim', this.value)">
             </td>
             <td>
-              <select onchange="updateKeyframe(${index}, 'mode', this.value)">
+              <select class="lkl-select" onchange="updateKeyframe(${index}, 'mode', this.value)">
                 <option value="instant" ${kf.mode === 'instant' ? 'selected' : ''}>${t('mode_instant')}</option>
                 <option value="transition" ${kf.mode === 'transition' ? 'selected' : ''}>${t('mode_transition')}</option>
                 <option value="interpolate" ${kf.mode === 'interpolate' ? 'selected' : ''}>${t('mode_interpolate')}</option>
               </select>
             </td>
-            <td style="${!showTransition ? 'opacity: 0.3;' : ''}">
-              <div style="display: flex; gap: 4px; align-items: center;">
-                <input type="number" min="0" max="23" step="1" 
+            <td class="${!showTransition ? 'is-inactive' : ''}">
+              <div class="hms">
+                <input class="lkl-input" type="number" min="0" max="23" step="1"
                        value="${Math.floor(kf.transitionSeconds / 3600)}"
                        ${!showTransition ? 'disabled' : ''}
                        placeholder="H"
                        title="${showTransition ? t('help_transition_note') || 'Stunden' : t('mode_interpolate') + ' - nicht verwendet'}"
-                       style="width: 45px;"
                        onchange="updateTransitionTime(${index}, this.parentElement)">
-                <span style="opacity: 0.5;">:</span>
-                <input type="number" min="0" max="59" step="1" 
+                <span class="hms-sep">:</span>
+                <input class="lkl-input" type="number" min="0" max="59" step="1"
                        value="${Math.floor((kf.transitionSeconds % 3600) / 60)}"
                        ${!showTransition ? 'disabled' : ''}
                        placeholder="M"
                        title="${showTransition ? 'Minuten' : t('mode_interpolate') + ' - nicht verwendet'}"
-                       style="width: 45px;"
                        onchange="updateTransitionTime(${index}, this.parentElement)">
-                <span style="opacity: 0.5;">:</span>
-                <input type="number" min="0" max="59" step="1" 
+                <span class="hms-sep">:</span>
+                <input class="lkl-input" type="number" min="0" max="59" step="1"
                        value="${kf.transitionSeconds % 60}"
                        ${!showTransition ? 'disabled' : ''}
                        placeholder="S"
                        title="${showTransition ? 'Sekunden' : t('mode_interpolate') + ' - nicht verwendet'}"
-                       style="width: 45px;"
                        onchange="updateTransitionTime(${index}, this.parentElement)">
               </div>
             </td>
-            <td style="${!showTransition ? 'opacity: 0.3;' : ''}">
-              <select onchange="updateKeyframe(${index}, 'transitionDirection', this.value)"
+            <td class="${!showTransition ? 'is-inactive' : ''}">
+              <select class="lkl-select" onchange="updateKeyframe(${index}, 'transitionDirection', this.value)"
                       ${!showTransition ? 'disabled' : ''}
                       title="${showTransition ? t('th_direction') : t('mode_interpolate') + ' - nicht verwendet'}">
                 <option value="after" ${(kf.transitionDirection || 'after') === 'after' ? 'selected' : ''}>${t('dir_after')}</option>
                 <option value="before" ${kf.transitionDirection === 'before' ? 'selected' : ''}>${t('dir_before')}</option>
               </select>
             </td>
-            <td>
-              <select onchange="updateKeyframe(${index}, 'curve', this.value)"
+            <td class="${!showCurve ? 'is-inactive' : ''}">
+              <select class="lkl-select" onchange="updateKeyframe(${index}, 'curve', this.value)"
                       ${!showCurve ? 'disabled' : ''}>
                 <option value="linear" ${kf.curve === 'linear' ? 'selected' : ''}>${t('curve_linear')}</option>
                 <option value="sinus" ${kf.curve === 'sinus' ? 'selected' : ''}>${t('curve_sinus')}</option>
               </select>
             </td>
             <td>
-              <button class="small danger" onclick="deleteKeyframe(${index})">
-                🗑️
+              <button class="lkl-btn is-quiet is-small is-danger" onclick="deleteKeyframe(${index})"
+                      title="Delete" aria-label="Delete">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>
+                </svg>
               </button>
             </td>
           </tr>
@@ -1418,6 +1229,7 @@ const translations = {
       html += `
           </tbody>
         </table>
+        </div>
       `;
 
       container.innerHTML = html;
@@ -1433,11 +1245,11 @@ const translations = {
       rows.forEach((row, index) => {
         row.addEventListener('dragstart', (e) => {
           draggedIndex = index;
-          row.style.opacity = '0.5';
+          row.classList.add('is-dragging');
         });
 
         row.addEventListener('dragend', (e) => {
-          row.style.opacity = '1';
+          row.classList.remove('is-dragging');
         });
 
         row.addEventListener('dragover', (e) => {
@@ -1754,9 +1566,29 @@ const translations = {
 
     let chart = null;
 
-    function renderChart() {
+    // Chart colours come from the LKL tokens on <html>, so the canvas follows
+    // theme and skin like the rest of the page.
+    function chartPalette() {
+      const cs = getComputedStyle(document.documentElement);
+      const token = name => cs.getPropertyValue(name).trim();
+      return {
+        accent: token('--lkl-accent'),
+        accentRgb: token('--lkl-accent-rgb'),
+        secondary: token('--lkl-text-2'),
+        text: token('--lkl-text-2'),
+        tick: token('--lkl-text-3'),
+        grid: token('--lkl-border'),
+        tooltipBg: token('--lkl-solid-1'),
+        tooltipText: token('--lkl-text'),
+        font: token('--lkl-font'),
+        fontMono: token('--lkl-font-mono')
+      };
+    }
+
+    function renderChart(options = {}) {
       const canvas = document.getElementById('chart');
       const ctx = canvas.getContext('2d');
+      const palette = chartPalette();
 
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1826,16 +1658,26 @@ const translations = {
             {
               label: t('chart_brightness'),
               data: dimNormalizedData,
-              borderColor: '#2196F3',
-              backgroundColor: 'rgba(33, 150, 243, 0.1)',
+              borderColor: palette.accent,
+              backgroundColor: `rgba(${palette.accentRgb}, 0.12)`,
+              fill: 'origin',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 4,
               yAxisID: 'y',
               tension: 0  // No smoothing - show actual data points
             },
             {
+              // One accent per app: the second series is set apart by the
+              // text step and a dash pattern, not by a second colour.
               label: t('chart_kelvin'),
               data: kelvinNormalizedData,
-              borderColor: '#FF9800',
-              backgroundColor: 'rgba(255, 152, 0, 0.1)',
+              borderColor: palette.secondary,
+              backgroundColor: palette.secondary,
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 4,
               yAxisID: 'y1',
               tension: 0  // No smoothing - show actual data points
             }
@@ -1844,15 +1686,27 @@ const translations = {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: options.animation === false ? false : undefined,
+          color: palette.text,
+          font: { family: palette.font },
           interaction: {
             mode: 'index',
             intersect: false
           },
           plugins: {
             legend: {
-              position: 'top'
+              position: 'top',
+              labels: { color: palette.text, font: { family: palette.font }, boxHeight: 2 }
             },
             tooltip: {
+              backgroundColor: palette.tooltipBg,
+              titleColor: palette.tooltipText,
+              bodyColor: palette.tooltipText,
+              footerColor: palette.tooltipText,
+              borderColor: palette.grid,
+              borderWidth: 1,
+              titleFont: { family: palette.font },
+              bodyFont: { family: palette.fontMono },
               callbacks: {
                 title: function(context) {
                   // Show exact time for the data point
@@ -1891,10 +1745,13 @@ const translations = {
                 maxRotation: 0,
                 minRotation: 0,
                 autoSkip: false,
+                color: palette.tick,
                 font: {
+                  family: palette.fontMono,
                   size: 11
                 }
               },
+              border: { color: palette.grid },
               grid: {
                 display: true,
                 color: function(context) {
@@ -1902,9 +1759,9 @@ const translations = {
                   const index = context.index;
                   const minutes = index * gridConfig.chartStepMinutes;
                   if (minutes % gridConfig.labelInterval === 0) {
-                    return 'rgba(0, 0, 0, 0.15)';
+                    return palette.grid;
                   }
-                  return 'rgba(0, 0, 0, 0)'; // Hide other grid lines
+                  return 'transparent'; // Hide other grid lines
                 }
               }
             },
@@ -1914,8 +1771,12 @@ const translations = {
               position: 'left',
               title: {
                 display: true,
-                text: 'Helligkeit %'
+                text: 'Helligkeit %',
+                color: palette.tick
               },
+              ticks: { color: palette.tick, font: { family: palette.fontMono } },
+              border: { color: palette.grid },
+              grid: { color: palette.grid },
               min: 0,
               max: 100
             },
@@ -1925,8 +1786,11 @@ const translations = {
               position: 'right',
               title: {
                 display: true,
-                text: 'Kelvin (normalisiert)'
+                text: 'Kelvin (normalisiert)',
+                color: palette.tick
               },
+              ticks: { color: palette.tick, font: { family: palette.fontMono } },
+              border: { color: palette.grid },
               min: 0,
               max: 100,
               grid: {
@@ -1946,24 +1810,17 @@ const translations = {
       const avgDim = Math.round(dimData.reduce((a, b) => a + b, 0) / dimData.length);
       const avgTransition = Math.round(transitionData.reduce((a, b) => a + b, 0) / transitionData.length);
 
-      document.getElementById('stats').innerHTML = `
-        <div class="stat-item">
-          <span class="stat-label">Keyframes:</span>
-          <span>${state.keyframes.length}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Ø Kelvin:</span>
-          <span>${avgKelvin} K</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Ø Helligkeit:</span>
-          <span>${avgDim}%</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Ø Transition:</span>
-          <span>${avgTransition}s</span>
-        </div>
-      `;
+      const stat = (labelKey, value) => `
+        <div class="lkl-stat">
+          <div class="lkl-stat-label">${t(labelKey).replace(/:$/, '')}</div>
+          <div class="lkl-stat-value">${value}</div>
+        </div>`;
+
+      document.getElementById('stats').innerHTML =
+        stat('stats_keyframes', state.keyframes.length) +
+        stat('stats_kelvin', `${avgKelvin} K`) +
+        stat('stats_brightness', `${avgDim} %`) +
+        stat('stats_transition', `${avgTransition} s`);
     }
 
     // ============================================================================
@@ -2049,6 +1906,22 @@ const translations = {
       URL.revokeObjectURL(url);
     }
 
+    // Print forces paper on white: render the chart once with the day/paper
+    // tokens, grab it, and restore the on-screen theme. All synchronous
+    // (animation off), so the browser never paints the intermediate state.
+    function captureChartForPrint() {
+      const root = document.documentElement;
+      const prev = { theme: root.dataset.theme, skin: root.dataset.skin };
+      root.dataset.theme = 'day';
+      root.dataset.skin = 'paper';
+      renderChart({ animation: false });
+      const img = document.getElementById('chart').toDataURL('image/png');
+      root.dataset.theme = prev.theme;
+      root.dataset.skin = prev.skin;
+      renderChart({ animation: false });
+      return img;
+    }
+
     function downloadPdf() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -2106,7 +1979,7 @@ const translations = {
         body: tableData,
         margin: { left: margin, right: margin },
         styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [33, 150, 243], fontStyle: 'bold' },
+        headStyles: { fillColor: [60, 90, 128], fontStyle: 'bold' },  // LKL accent blue (day)
         theme: 'striped'
       });
       
@@ -2125,7 +1998,7 @@ const translations = {
       
       // Get chart as image
       const canvas = document.getElementById('chart');
-      const chartImg = canvas.toDataURL('image/png');
+      const chartImg = captureChartForPrint();
       const chartWidth = pageWidth - 2 * margin;
       const chartHeight = (chartWidth / canvas.width) * canvas.height;
       
@@ -2328,8 +2201,27 @@ const translations = {
     // INITIALIZATION
     // ============================================================================
 
+    function setupThemeControls() {
+      const buttons = document.querySelectorAll('[data-theme-k]');
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          lklTheme.set({ [btn.dataset.themeK]: btn.dataset.themeV });
+        });
+      });
+      lklTheme.subscribe(resolved => {
+        buttons.forEach(btn => {
+          const k = btn.dataset.themeK;
+          const current = k === 'theme' ? resolved.themePref : resolved[k];
+          btn.classList.toggle('is-active', current === btn.dataset.themeV);
+        });
+        // Canvas does not inherit CSS — redraw with the new tokens
+        if (chart) renderChart();
+      });
+    }
+
     loadState();
     setLanguage(currentLang);  // Initialize i18n
+    setupThemeControls();
   </script>
 </body>
 </html>
