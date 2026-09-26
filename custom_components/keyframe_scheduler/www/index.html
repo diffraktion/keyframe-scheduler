@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="styleguide/lkl-theme.css">
   <!-- Before paint, otherwise the wrong theme flashes briefly. -->
   <script src="styleguide/lkl-theme.js"></script>
+  <script src="js/astro.js"></script>
   <style>
     /* App-specific layout on top of the LKL UI style guide.
        RULE: no colour literals here, only --lkl-* tokens. */
@@ -79,6 +80,8 @@
     .lkl-input.is-lg { font-size: var(--lkl-fs-lg); font-weight: 600; }
 
     .btn-row { display: flex; flex-wrap: wrap; gap: var(--lkl-space-2); }
+    /* The preset picker sits in a row of buttons and should read like one */
+    .lkl-select.preset-select { width: auto; font-weight: 600; font-size: var(--lkl-fs-md); cursor: pointer; }
     .spaced { margin-top: var(--lkl-space-4); }
 
     .lkl-btn.is-small { padding: var(--lkl-space-1) var(--lkl-space-2); }
@@ -139,15 +142,9 @@
       color: var(--lkl-text-3);
     }
 
-    /* ---- Chart & stats ------------------------------------------------------- */
+    /* ---- Chart --------------------------------------------------------------- */
     .chart-container { position: relative; height: 400px; }
     canvas { max-height: 100%; }
-
-    .stat-grid {
-      display: grid;
-      gap: var(--lkl-space-3);
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
 
     /* ---- JSON editor --------------------------------------------------------- */
     details { margin-top: var(--lkl-space-4); }
@@ -173,6 +170,141 @@
       outline: none;
     }
     .json-box:focus { border-color: var(--lkl-accent); box-shadow: 0 0 0 3px var(--lkl-focus); }
+
+    /* ---- Location ------------------------------------------------------------ */
+    .location-grid {
+      display: grid;
+      gap: var(--lkl-space-4);
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      align-items: end;
+    }
+    .location-grid .btn-row { padding-bottom: 1px; }
+    .sub-head {
+      font-size: var(--lkl-fs-sm);
+      font-weight: 600;
+      color: var(--lkl-text-2);
+      margin: var(--lkl-space-5) 0 var(--lkl-space-3);
+    }
+
+    /* ---- Trigger cell -------------------------------------------------------- */
+    .trigger { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lkl-space-1); }
+    /* Room for "Sonne · event · offset · min · resolved time" on one line;
+       the table scrolls horizontally on narrow screens instead. */
+    .keyframes-table td.trigger-td { min-width: 370px; }
+    .keyframes-table .trigger .event-select { max-width: 180px; }
+    .trigger + .trigger { margin-top: var(--lkl-space-1); }
+    .trigger-label { font-size: var(--lkl-fs-xs); color: var(--lkl-text-3); }
+    .keyframes-table .trigger input.offset { width: 64px; }
+    .keyframes-table .trigger input.bound { width: 96px; }
+
+    /* ---- Order conflicts ----------------------------------------------------- */
+    .conflict-pair {
+      margin-top: var(--lkl-space-3);
+      padding: var(--lkl-space-3) var(--lkl-space-4);
+      border: 1px solid var(--lkl-warn-border);
+      border-radius: var(--lkl-radius-sm);
+      background: var(--lkl-surface-2);
+    }
+    .conflicts summary { display: flex; align-items: center; gap: var(--lkl-space-2); color: var(--lkl-warn); }
+    .conflicts summary .lkl-meta { font-weight: 400; }
+    .conflicts summary.has-overlap { color: var(--lkl-danger); }
+    .conflict-row.is-overlap {
+      margin: 0 calc(-1 * var(--lkl-space-4));
+      padding-left: var(--lkl-space-4);
+      padding-right: var(--lkl-space-4);
+      background: var(--lkl-danger-bg);
+      box-shadow: inset 3px 0 0 var(--lkl-danger);
+    }
+    .conflict-head { font-weight: 600; margin-bottom: var(--lkl-space-2); }
+    .group-box {
+      margin-top: var(--lkl-space-3);
+      padding: 0 var(--lkl-space-4);
+      border: 1px solid var(--lkl-accent-border);
+      border-radius: var(--lkl-radius-sm);
+      background: var(--lkl-surface-2);
+    }
+    .group-box .conflict-row { border-top: none; }
+    .hints ul { margin: var(--lkl-space-1) 0 0; padding-left: var(--lkl-space-5); }
+    .hints li + li { margin-top: var(--lkl-space-1); }
+    .keyframes-table .group-select { min-width: 0; width: 56px; }
+    .conflict-vs { color: var(--lkl-text-3); margin: 0 var(--lkl-space-2); }
+    .conflict-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--lkl-space-2) var(--lkl-space-4);
+      padding: var(--lkl-space-2) 0;
+      border-top: 1px solid var(--lkl-border);
+    }
+
+    /* ---- View toolbars ------------------------------------------------------- */
+    .view-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--lkl-space-3);
+      margin-bottom: var(--lkl-space-3);
+    }
+    .view-toolbar .card-head { margin: 0; }
+    .toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lkl-space-2); }
+    .toolbar-group .lkl-input { width: auto; }
+    .toolbar-sep { align-self: stretch; width: 1px; margin: 2px var(--lkl-space-1); background: var(--lkl-border); }
+    .toolbar-value { font-family: var(--lkl-font-mono); font-weight: 600; min-width: 4ch; text-align: center; }
+    .sun-info { display: flex; flex-wrap: wrap; gap: var(--lkl-space-2); margin-bottom: var(--lkl-space-3); }
+
+    /* ---- Year view ----------------------------------------------------------- */
+    .overlap-pill { font: inherit; font-size: var(--lkl-fs-xs); cursor: pointer; }
+    .year-wrap { position: relative; }
+    .overlap-notice { margin-bottom: var(--lkl-space-3); }
+    .overlap-notice strong { color: inherit; }
+    .spaced-sm { margin-top: var(--lkl-space-2); }
+    .legend-line.is-danger { border-top-color: var(--lkl-danger); border-top-width: 3px; }
+    #yearCanvas { display: block; width: 100%; height: 340px; cursor: crosshair; }
+    .year-tooltip {
+      position: absolute;
+      pointer-events: none;
+      z-index: 2;
+      min-width: 180px;
+      padding: var(--lkl-space-2) var(--lkl-space-3);
+      font-size: var(--lkl-fs-sm);
+      line-height: var(--lkl-lh-tight);
+      background: var(--lkl-solid-1);
+      color: var(--lkl-text);
+      border: 1px solid var(--lkl-border);
+      border-radius: var(--lkl-radius-sm);
+      box-shadow: var(--lkl-shadow-card);
+    }
+    .year-tooltip .lkl-mono { color: var(--lkl-text-2); }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--lkl-space-4);
+      margin-top: var(--lkl-space-2);
+      font-size: var(--lkl-fs-sm);
+      color: var(--lkl-text-3);
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: var(--lkl-space-2); }
+    .legend-line { width: 22px; border-top: 2px solid var(--lkl-text-2); }
+    .legend-line.is-dashed { border-top-style: dashed; }
+    .legend-line.is-accent { border-top-color: var(--lkl-accent); }
+    .legend-line.is-dotted { border-top-style: dotted; border-top-color: var(--lkl-warn); }
+    .year-scale-bar {
+      width: 180px;
+      height: 10px;
+      border-radius: 2px;
+      border: 1px solid var(--lkl-border);
+    }
+    .year-scale-ticks {
+      position: relative;
+      display: block;
+      width: 180px;
+      height: 1.4em;
+      font-family: var(--lkl-font-mono);
+      font-size: var(--lkl-fs-xs);
+    }
+    .year-scale-ticks span { position: absolute; top: 0; white-space: nowrap; }
 
     @media (max-width: 768px) {
       body { padding: var(--lkl-space-3); }
@@ -215,7 +347,7 @@
       // For local files, replace the current filename
       const current = window.location.href;
       const lastSlash = current.lastIndexOf('/');
-      const lastBackslash = current.lastIndexOf('\');
+      const lastBackslash = current.lastIndexOf('\\');
       const sep = Math.max(lastSlash, lastBackslash);
       if (sep > 0) {
         window.location.href = current.substring(0, sep + 1) + filename;
@@ -258,15 +390,30 @@
             <option value="72" id="opt-72h">72 Stunden</option>
           </select>
         </div>
+      </div>
 
+      <!-- Location — needed for sun-based keyframes -->
+      <h3 class="sub-head" id="label-location">Standort</h3>
+      <div class="location-grid">
         <div class="field">
-          <label class="lkl-label" for="wrapAround" id="label-wrap-around">Wiederholung</label>
-          <select class="lkl-select" id="wrapAround">
-            <option value="true" selected id="opt-repeat-daily">Täglich wiederholen</option>
-            <option value="false" id="opt-repeat-once">Einmalig</option>
-          </select>
+          <label class="lkl-label" for="locLat" id="label-lat">Breitengrad</label>
+          <input class="lkl-input" type="number" id="locLat" min="-90" max="90" step="0.0001">
+        </div>
+        <div class="field">
+          <label class="lkl-label" for="locLon" id="label-lon">Längengrad</label>
+          <input class="lkl-input" type="number" id="locLon" min="-180" max="180" step="0.0001">
+        </div>
+        <div class="field">
+          <label class="lkl-label" for="locTz" id="label-tz">Zeitzone</label>
+          <input class="lkl-input is-text" type="text" id="locTz" list="tzList" spellcheck="false">
+          <datalist id="tzList"></datalist>
+        </div>
+        <div class="btn-row">
+          <button class="lkl-btn" id="locFromHaBtn">Aus Home Assistant</button>
+          <button class="lkl-btn" id="locFromBrowserBtn">Browser-Standort</button>
         </div>
       </div>
+      <small class="field-help" id="help-location"></small>
 
       <div class="lkl-banner spaced" id="keyframe-tip"><!-- Filled by updateTip() --></div>
     </section>
@@ -280,7 +427,12 @@
       <div class="btn-row">
         <button class="lkl-btn is-primary" id="addKeyframeBtn">Keyframe hinzufügen</button>
         <button class="lkl-btn" id="sortByTimeBtn">Nach Zeit sortieren</button>
-        <button class="lkl-btn" id="loadPresetBtn">Beispiel laden</button>
+        <select class="lkl-select preset-select" id="presetSelect" aria-label="Beispiel laden">
+          <option value="" id="opt-preset-none">Beispiel laden …</option>
+          <option value="time" id="opt-preset-time">Büroprofil Lichtdusche</option>
+          <option value="sun" id="opt-preset-sun">Reine Astrosteuerung</option>
+          <option value="mixed" id="opt-preset-mixed">Gemischt (Überlappung in Berlin)</option>
+        </select>
         <button class="lkl-btn" id="loadFileBtn">Datei laden</button>
       </div>
       <input type="file" id="fileInputTop" accept=".json" hidden>
@@ -289,23 +441,74 @@
         <!-- Table will be inserted here -->
       </div>
 
+      <div id="conflictsContainer"></div>
+
       <div class="lkl-banner spaced" id="info-box">
         <!-- Will be populated by updateInfoBox() -->
       </div>
     </section>
 
-    <!-- Chart Card -->
+    <!-- Year Card -->
     <section class="lkl-card">
-      <div class="card-head">
-        <h2 class="lkl-h2" id="card-title-preview">Vorschau</h2>
+      <div class="view-toolbar">
+        <div class="card-head">
+          <h2 class="lkl-h2" id="card-title-year">Jahresübersicht</h2>
+        </div>
+        <div class="toolbar-group">
+          <div class="control-group">
+            <span class="control-group-label" id="yearGroupArtificial">Kunstlicht</span>
+            <button class="lkl-chip is-compact is-active" data-year-mode="dim" id="yearModeDim">Helligkeit</button>
+            <button class="lkl-chip is-compact" data-year-mode="kelvin" id="yearModeKelvin">Farbtemperatur</button>
+          </div>
+          <span class="toolbar-sep"></span>
+          <button class="lkl-chip is-compact" data-year-mode="daylight" id="yearModeDaylight">Tageslicht</button>
+          <span class="toolbar-sep"></span>
+          <div class="lkl-chip-row">
+            <button class="lkl-chip is-compact is-active" data-year-overlay="sun" id="yearShowSun">Sonne</button>
+            <button class="lkl-chip is-compact is-active" data-year-overlay="keyframes" id="yearShowKf">Keyframes</button>
+          </div>
+          <button class="lkl-btn is-small" id="yearPrevBtn" aria-label="Previous year">‹</button>
+          <span class="toolbar-value" id="yearValue">2026</span>
+          <button class="lkl-btn is-small" id="yearNextBtn" aria-label="Next year">›</button>
+        </div>
       </div>
+
+      <div class="lkl-banner is-danger overlap-notice" id="overlapNotice" hidden></div>
+
+      <div class="year-wrap" id="yearWrap">
+        <canvas id="yearCanvas"></canvas>
+        <div class="year-tooltip" id="yearTooltip" hidden></div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item" id="yearScale"></span>
+        <span class="legend-item"><span class="legend-line"></span><span id="legend-sun">Sonnenauf-/untergang</span></span>
+        <span class="legend-item"><span class="legend-line is-dashed"></span><span id="legend-civil">Bürgerliche Dämmerung</span></span>
+        <span class="legend-item"><span class="legend-line is-dotted"></span><span id="legend-keyframes">Keyframe-Zeiten</span></span>
+        <span class="legend-item"><span class="legend-line is-accent"></span><span id="legend-selected">Gewählter Tag</span></span>
+        <span class="legend-item"><span class="legend-line is-danger"></span><span id="legend-overlap">Überlappung (ohne Regel)</span></span>
+        <span id="year-help">Klicke auf einen Tag, um ihn unten im Detail zu sehen.</span>
+      </div>
+    </section>
+
+    <!-- Day Card -->
+    <section class="lkl-card" id="dayCard">
+      <div class="view-toolbar">
+        <div class="card-head">
+          <h2 class="lkl-h2" id="card-title-preview">Tagesansicht</h2>
+        </div>
+        <div class="toolbar-group">
+          <button class="lkl-btn is-small" id="dayPrevBtn" aria-label="Previous day">‹</button>
+          <input class="lkl-input" type="date" id="viewDate">
+          <button class="lkl-btn is-small" id="dayNextBtn" aria-label="Next day">›</button>
+          <button class="lkl-btn is-small" id="todayBtn">Heute</button>
+        </div>
+      </div>
+
+      <div class="sun-info" id="sunInfo"></div>
 
       <div class="chart-container">
         <canvas id="chart"></canvas>
-      </div>
-
-      <div class="stat-grid spaced" id="stats">
-        <!-- Stats will be inserted here -->
       </div>
 
       <div class="btn-row spaced">
@@ -348,14 +551,68 @@
     // ============================================================================
 
     const STORAGE_KEY = 'keyframe_scheduler_data';
+    // Keyframe shorthand for the presets below
+    const presetKf = (time, kelvin, dim, mode, extra = {}) => ({
+      time, kelvin, dim, mode,
+      transitionSeconds: 600, transitionDirection: 'after', curve: 'sinus',
+      ...extra
+    });
+    const sunKf = (sunEvent, offsetMinutes, kelvin, dim, mode, extra = {}) =>
+      presetKf('12:00', kelvin, dim, mode, { trigger: 'sun', sunEvent, offsetMinutes, ...extra });
+
     const PRESETS = {
-      example: [
-        { time: "06:00", kelvin: 2700, dim: 30, mode: "transition", transitionSeconds: 1800, transitionDirection: "before", curve: "sinus" },
-        { time: "08:00", kelvin: 5000, dim: 100, mode: "interpolate", transitionSeconds: 300, transitionDirection: "after", curve: "linear" },
-        { time: "20:00", kelvin: 3500, dim: 70, mode: "interpolate", transitionSeconds: 600, transitionDirection: "after", curve: "sinus" },
-        { time: "23:00", kelvin: 2700, dim: 20, mode: "transition", transitionSeconds: 900, transitionDirection: "before", curve: "linear" }
+      // 1. Local time only: LKL office profile "Lichtdusche fokussiert"
+      //    (lichtdusche-fokussiert-original-es-2026-02-12.json) — activating
+      //    day curve with two light showers at 15:30 and 16:30 (30 s to 100 %).
+      time: [
+        presetKf('06:00', 4000, 50, 'interpolate', { transitionSeconds: 1800 }),
+        presetKf('08:00', 4500, 80, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('10:00', 5000, 100, 'interpolate', { transitionSeconds: 600 }),
+        presetKf('12:00', 4500, 100, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('14:00', 4000, 100, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('15:00', 4000, 70, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('15:30', 4000, 100, 'transition', { transitionSeconds: 30, curve: 'linear' }),   // light shower
+        presetKf('16:00', 3500, 70, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('16:30', 3500, 100, 'transition', { transitionSeconds: 30, curve: 'linear' }),   // light shower
+        presetKf('17:00', 3000, 100, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('19:00', 2700, 100, 'interpolate', { transitionSeconds: 300 }),
+        presetKf('22:00', 2700, 100, 'interpolate', { transitionSeconds: 300 })
+      ],
+
+      // 2. Sun only: every keyframe follows the sun. These events keep their
+      //    order all year at mid latitudes, so there are no overlaps. (Solar
+      //    midnight is left out on purpose: in November it falls at ~23:50
+      //    CET in Berlin, i.e. after everything else — a real overlap.)
+      sun: [
+        sunKf('civil_dawn', 0, 2700, 20, 'transition', { transitionSeconds: 1800 }),
+        sunKf('sunrise', 30, 4000, 70, 'interpolate'),
+        sunKf('solar_noon', 0, 5500, 100, 'interpolate'),
+        sunKf('golden_hour_start', 0, 3500, 70, 'interpolate'),
+        sunKf('sunset', 0, 2700, 50, 'interpolate'),
+        sunKf('civil_dusk', 60, 2200, 10, 'transition', { transitionSeconds: 1800 })  // night level
+      ],
+
+      // 3. Mixed: fixed times around the working day, the sun in between.
+      //    In Berlin two pairs swap order during the year — conflicts, left
+      //    ungrouped on purpose so they show up red: sunrise +60 (#2) comes
+      //    before 06:30 (#1) in early summer, and sunset (#4) after 20:00 (#5)
+      //    from spring to late summer.
+      mixed: [
+        presetKf('06:30', 3000, 40, 'transition', { transitionSeconds: 1800, transitionDirection: 'before' }),
+        // A transition, not an interpolation: if #1 is skipped (e.g. after
+        // grouping), an interpolate keyframe here would ramp up all night long
+        // from the previous evening.
+        sunKf('sunrise', 60, 5000, 100, 'transition', { transitionSeconds: 1800, transitionDirection: 'before' }),
+        presetKf('12:30', 5500, 100, 'interpolate'),
+        sunKf('sunset', 0, 3500, 70, 'interpolate'),
+        presetKf('20:00', 2700, 50, 'instant'),
+        presetKf('22:30', 2200, 10, 'transition', { transitionSeconds: 1800, transitionDirection: 'before' })
       ]
     };
+    const PRESET_NAMES = ['time', 'sun', 'mixed'];
+
+    // Used until the user (or Home Assistant) provides a location.
+    const DEFAULT_LOCATION = { lat: 52.5200, lon: 13.4050, tz: 'Europe/Berlin' };
 
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
     const pad2 = n => String(n).padStart(2, '0');
@@ -366,9 +623,45 @@
     }
 
     function formatTime(minutes) {
-      const h = Math.floor(minutes / 60) % 24;
-      const m = minutes % 60;
+      const total = Math.round(minutes);
+      const h = Math.floor(total / 60) % 24;
+      const m = total % 60;
       return `${pad2(h)}:${pad2(m)}`;
+    }
+
+    function formatDuration(minutes) {
+      const total = Math.round(minutes);
+      return `${Math.floor(total / 60)} h ${pad2(total % 60)} min`;
+    }
+
+    // ---- Calendar dates as "YYYY-MM-DD" strings (no timezone ambiguity) ----
+
+    function todayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    }
+
+    function parseDate(s) {
+      const [y, m, d] = s.split('-').map(Number);
+      return { y, m, d };
+    }
+
+    function addDays(s, n) {
+      const { y, m, d } = parseDate(s);
+      return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+    }
+
+    function daysInYear(y) {
+      return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
+    }
+
+    function uiLocale() {
+      return currentLang === 'de' ? 'de-DE' : currentLang === 'es' ? 'es-ES' : 'en-US';
+    }
+
+    function formatDate(s, opts = { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) {
+      const { y, m, d } = parseDate(s);
+      return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(uiLocale(), { timeZone: 'UTC', ...opts });
     }
 
     function easeSinus(t) {
@@ -387,9 +680,380 @@
       scheduleName: 'My Schedule',  // NEW: User-defined schedule name
       stepMinutes: 5,
       horizonHours: 48,
-      wrapAround: true,
+      location: null,   // { lat, lon, tz } — null until set, see getLocation()
+      groupRules: {},     // { A: "earliest" | "latest" | "all" }, see listGroups()
       keyframes: []
     };
+
+    // Day shown in the day view (and highlighted in the year view). Not persisted:
+    // the app always opens on today.
+    let viewDate = todayStr();
+    let yearMode = 'dim';
+    let yearOverlays = { sun: true, keyframes: true };
+    let yearGrid = null;   // cached year simulation, see computeYearGrid()
+
+    // ============================================================================
+    // SUN-BASED KEYFRAMES
+    // ============================================================================
+
+    function getLocation() {
+      const loc = state.location || DEFAULT_LOCATION;
+      const valid = Number.isFinite(loc.lat) && Math.abs(loc.lat) <= 90 &&
+                    Number.isFinite(loc.lon) && Math.abs(loc.lon) <= 180 &&
+                    KfAstro.isValidTimeZone(loc.tz);
+      return valid ? loc : null;
+    }
+
+    function getSunTimes(dateStr) {
+      const loc = getLocation();
+      if (!loc) return null;
+      const { y, m, d } = parseDate(dateStr);
+      return KfAstro.sunTimes(y, m, d, loc.lat, loc.lon, loc.tz);
+    }
+
+    function sunAltitudeAt(dateStr, minutes) {
+      const loc = getLocation();
+      if (!loc) return null;
+      const { y, m, d } = parseDate(dateStr);
+      return KfAstro.altitudeAt(y, m, d, minutes, loc.lat, loc.lon, loc.tz);
+    }
+
+    function newKeyframeId() {
+      return 'kf' + Math.random().toString(36).slice(2, 8);
+    }
+
+    /** Fill in fields that files or storage from older versions lack. */
+    function normalizeKeyframe(kf) {
+      return {
+        id: typeof kf.id === 'string' && kf.id ? kf.id : newKeyframeId(),
+        time: kf.time || '00:00',
+        kelvin: kf.kelvin,
+        dim: kf.dim,
+        mode: kf.mode || 'instant',
+        curve: kf.curve || 'linear',
+        transitionSeconds: kf.transitionSeconds ?? 300,
+        transitionDirection: kf.transitionDirection || 'after',
+        trigger: kf.trigger === 'sun' ? 'sun' : 'time',
+        sunEvent: KfAstro.EVENTS[kf.sunEvent] ? kf.sunEvent : 'sunset',
+        offsetMinutes: Number.isFinite(kf.offsetMinutes) ? kf.offsetMinutes : 0,
+        notBefore: kf.notBefore || '',
+        notAfter: kf.notAfter || '',
+        group: GROUP_IDS.includes(kf.group) ? kf.group : ''
+      };
+    }
+
+    /**
+     * Minutes since local midnight at which a keyframe fires on dateStr, or
+     * null if it does not fire that day.
+     * Sun keyframes: event time + offset, clamped to [notBefore, notAfter].
+     * If the event does not happen at all (polar day/night, astronomical
+     * twilight in a northern summer) the bound takes over; without a bound
+     * the keyframe is skipped for that day.
+     */
+    function resolveKeyframeMinutes(kf, dateStr) {
+      if (kf.trigger !== 'sun') return parseTime(kf.time);
+
+      const lo = kf.notBefore ? parseTime(kf.notBefore) : null;
+      const hi = kf.notAfter ? parseTime(kf.notAfter) : null;
+      const sun = getSunTimes(dateStr);
+      const eventMinutes = sun ? sun.events[kf.sunEvent] : null;
+
+      if (eventMinutes == null) {
+        const fallback = KfAstro.EVENTS[kf.sunEvent].rising ? (lo ?? hi) : (hi ?? lo);
+        return fallback;
+      }
+
+      let m = eventMinutes + (kf.offsetMinutes || 0);
+      if (lo != null) m = Math.max(m, lo);
+      if (hi != null) m = Math.min(m, hi);
+      return clamp(Math.round(m), 0, 1439);
+    }
+
+    // Resolved keyframe lists per date. Invalidated on every state change.
+    let resolvedCache = new Map();
+    function invalidateResolved() { resolvedCache = new Map(); yearGrid = null; conflictCache = null; hintCache = null; }
+
+    // ---- Keyframe groups & order conflicts ----------------------------------
+    //
+    // A fixed-time and a sun keyframe (or two sun keyframes) can swap their
+    // order over the year: "sunset" is before "20:00" in winter and after it in
+    // summer. Evaluated purely chronologically, each one then overrides the
+    // other depending on the season — a CONFLICT.
+    //
+    // Keyframes that play the same role (e.g. "start of the evening") can be
+    // put into a GROUP (kf.group = 'A', 'B', …), any number of members. The
+    // group's rule decides per day which member fires:
+    //   earliest — only the member that comes first that day
+    //   latest   — only the member that comes last that day
+    //   all      — all of them, chronologically (the swap is accepted)
+    // The other members are skipped on that day.
+    //
+    // state.groupRules: { A: 'earliest' | 'latest' | 'all', … }
+
+    const GROUP_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const GROUP_RULES = ['earliest', 'latest', 'all'];
+
+    function groupRule(groupId) {
+      const r = (state.groupRules || {})[groupId];
+      return GROUP_RULES.includes(r) ? r : 'earliest';
+    }
+
+    /** Groups in use, in letter order: [{ id, rule, members: [index…] }] */
+    function listGroups() {
+      return GROUP_IDS
+        .map(id => ({
+          id,
+          rule: groupRule(id),
+          members: state.keyframes.map((kf, i) => (kf.group === id ? i : -1)).filter(i => i >= 0)
+        }))
+        .filter(g => g.members.length);
+    }
+
+    /** Resolved minutes of every keyframe on dateStr, before group rules. */
+    function resolveRawMinutes(dateStr) {
+      return state.keyframes.map(kf => resolveKeyframeMinutes(kf, dateStr));
+    }
+
+    /** Minutes per keyframe on dateStr after group rules (null = does not fire). */
+    function resolveFiringMinutes(dateStr) {
+      const minutes = resolveRawMinutes(dateStr);
+      listGroups().forEach(g => {
+        if (g.rule === 'all') return;
+        const firing = g.members.filter(i => minutes[i] != null);
+        if (firing.length < 2) return;
+        // Ties go to the member higher up in the table
+        const winner = firing.reduce((best, i) =>
+          (g.rule === 'earliest' ? minutes[i] < minutes[best] : minutes[i] > minutes[best]) ? i : best);
+        firing.forEach(i => { if (i !== winner) minutes[i] = null; });
+      });
+      return minutes;
+    }
+
+    /** Keyframes of dateStr with sun triggers turned into concrete HH:MM and
+        group rules applied (skipped keyframes are left out). */
+    function resolveKeyframes(dateStr) {
+      let list = resolvedCache.get(dateStr);
+      if (list) return list;
+      const minutes = resolveFiringMinutes(dateStr);
+      list = [];
+      state.keyframes.forEach((kf, index) => {
+        if (minutes[index] == null) return;
+        list.push({ ...kf, time: formatTime(minutes[index]), sourceIndex: index });
+      });
+      resolvedCache.set(dateStr, list);
+      return list;
+    }
+
+    /** True if the keyframe fires on dateStr after group rules. */
+    function firesOn(kf, dateStr) {
+      return resolveKeyframes(dateStr).some(r => r.id === kf.id);
+    }
+
+    let conflictCache = null;
+
+    /**
+     * Pairs of keyframes whose order changes during the year of viewDate and
+     * that are not in the same group. Only days where both fire count. The
+     * less frequent order is the one marked as overlap:
+     *   { i, j, early, late, overlapDays, usualDays }
+     * — on overlapDays `early` fires before `late`, on the other days it is
+     * the other way round.
+     */
+    function analyzeConflicts() {
+      const year = parseDate(viewDate).y;
+      if (conflictCache && conflictCache.year === year) return conflictCache.pairs;
+
+      const kfs = state.keyframes;
+      const days = daysInYear(year);
+      const perDay = [];
+      for (let d = 0; d < days; d++) perDay.push(resolveFiringMinutes(addDays(`${year}-01-01`, d)));
+
+      const pairs = [];
+      for (let i = 0; i < kfs.length; i++) {
+        for (let j = i + 1; j < kfs.length; j++) {
+          if (kfs[i].trigger !== 'sun' && kfs[j].trigger !== 'sun') continue;
+          if (kfs[i].group && kfs[i].group === kfs[j].group) continue;   // handled by the group
+          const iFirst = [], jFirst = [];
+          for (let d = 0; d < days; d++) {
+            const mi = perDay[d][i], mj = perDay[d][j];
+            if (mi == null || mj == null || mi === mj) continue;
+            (mi < mj ? iFirst : jFirst).push(d);
+          }
+          if (!iFirst.length || !jFirst.length) continue;
+          const iIsRare = iFirst.length < jFirst.length ||
+                          (iFirst.length === jFirst.length && i > j);
+          pairs.push(iIsRare
+            ? { i, j, early: i, late: j, overlapDays: iFirst, usualDays: jFirst }
+            : { i, j, early: j, late: i, overlapDays: jFirst, usualDays: iFirst });
+        }
+      }
+      conflictCache = { year, pairs };
+      return pairs;
+    }
+
+    let hintCache = null;
+
+    /**
+     * Hints about setups that silently change the curve over the year (year
+     * of viewDate). Not errors — each can be intended:
+     *   mixedModes  — a group whose members have different modes: which one
+     *                 wins changes how the curve runs before and after it
+     *   predecessor — an interpolate keyframe starts from different keyframes
+     *                 depending on the day (interpolate = "from the previous")
+     *   overnight   — an interpolate keyframe ramps across midnight from the
+     *                 previous evening, i.e. the whole night changes
+     */
+    function analyzeHints() {
+      const year = parseDate(viewDate).y;
+      if (hintCache && hintCache.year === year) return hintCache.hints;
+
+      const hints = [];
+      listGroups().forEach(g => {
+        const modes = [...new Set(g.members.map(i => state.keyframes[i].mode))];
+        if (modes.length > 1) hints.push({ type: 'mixedModes', group: g.id, modes });
+      });
+
+      const days = daysInYear(year);
+      const preds = {};      // interpolate index → { predecessor index → days }
+      const overnight = {};  // interpolate index → { days, example }
+      let previousLast = null;
+      for (let d = -1; d < days; d++) {
+        const date = addDays(`${year}-01-01`, d);
+        const list = resolveKeyframes(date)
+          .map(k => ({ i: k.sourceIndex, m: parseTime(k.time), mode: k.mode }))
+          .sort((a, b) => a.m - b.m);
+        if (d >= 0) {
+          list.forEach((k, pos) => {
+            if (k.mode !== 'interpolate') return;
+            const pred = pos > 0 ? list[pos - 1] : previousLast;
+            if (!pred) return;
+            (preds[k.i] = preds[k.i] || {})[pred.i] = (preds[k.i][pred.i] || 0) + 1;
+            if (pos === 0 && pred.m > k.m) {
+              const o = overnight[k.i] = overnight[k.i] || { days: 0, example: null };
+              o.days++;
+              if (!o.example) o.example = { from: pred.m, to: k.m, date };
+            }
+          });
+        }
+        previousLast = list.length ? list[list.length - 1] : previousLast;
+      }
+
+      // A changing predecessor that an open conflict already explains (the
+      // keyframe itself or two of its predecessors swap order) is not
+      // repeated here — the red conflict says the same.
+      const conflicts = analyzeConflicts();
+      Object.keys(preds).forEach(i => {
+        const k = +i;
+        const entries = Object.entries(preds[i]).map(([p, n]) => ({ pred: +p, days: n }));
+        if (entries.length < 2) return;
+        const predSet = new Set(entries.map(e => e.pred));
+        const explained = conflicts.some(p =>
+          p.i === k || p.j === k || (predSet.has(p.i) && predSet.has(p.j)));
+        if (!explained) {
+          hints.push({ type: 'predecessor', kf: k, preds: entries.sort((a, b) => b.days - a.days) });
+        }
+      });
+      Object.keys(overnight).forEach(i => {
+        hints.push({ type: 'overnight', kf: +i, ...overnight[i] });
+      });
+
+      hintCache = { year, hints };
+      return hints;
+    }
+
+    /** Conflicts in their rare order on a given date: [{ pair, mEarly, mLate }]. */
+    function overlapsOn(dateStr) {
+      const pairs = analyzeConflicts();
+      if (!pairs.length) return [];
+      const minutes = resolveFiringMinutes(dateStr);
+      return pairs
+        .filter(p => minutes[p.early] != null && minutes[p.late] != null && minutes[p.early] < minutes[p.late])
+        .map(p => ({ pair: p, mEarly: minutes[p.early], mLate: minutes[p.late] }));
+    }
+
+    function openConflicts() {
+      conflictsOpen = true;
+      renderConflicts();
+      document.getElementById('conflictsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    /** Put keyframes i and j into one group with the given rule. Joins an
+        existing group of either one (merging two groups if needed). */
+    function groupPair(i, j, rule) {
+      const kfs = state.keyframes;
+      const used = new Set(kfs.map(kf => kf.group).filter(Boolean));
+      const target = kfs[i].group || kfs[j].group || GROUP_IDS.find(id => !used.has(id));
+      if (!target) return;   // all letters in use
+      [kfs[i].group, kfs[j].group].forEach(old => {
+        if (old && old !== target) kfs.forEach(kf => { if (kf.group === old) kf.group = target; });
+      });
+      kfs[i].group = kfs[j].group = target;
+      setGroupRule(target, rule);
+    }
+
+    function setGroupRule(groupId, rule) {
+      if (!GROUP_IDS.includes(groupId) || !GROUP_RULES.includes(rule)) return;
+      state.groupRules = { ...(state.groupRules || {}), [groupId]: rule };
+      saveState();
+      updateUI();
+    }
+
+    function dissolveGroup(groupId) {
+      state.keyframes.forEach(kf => { if (kf.group === groupId) kf.group = ''; });
+      pruneGroups();
+      saveState();
+      updateUI();
+    }
+
+    /** Imported or hand-edited files may repeat ids — keep them unique. */
+    function ensureUniqueIds() {
+      const seen = new Set();
+      state.keyframes.forEach(kf => {
+        while (seen.has(kf.id)) kf.id = newKeyframeId();
+        seen.add(kf.id);
+      });
+    }
+
+    /** Drop rules of groups that have no members any more. */
+    function pruneGroups() {
+      const inUse = new Set(state.keyframes.map(kf => kf.group).filter(Boolean));
+      const rules = {};
+      Object.keys(state.groupRules || {}).forEach(id => {
+        if (inUse.has(id)) rules[id] = state.groupRules[id];
+      });
+      state.groupRules = rules;
+    }
+
+    /** "24.04.–19.08., 03.10.–05.10." — contiguous day ranges, merged over New Year. */
+    function formatDayRanges(dayIndices, year) {
+      if (!dayIndices.length) return '';
+      const days = daysInYear(year);
+      const ranges = [];
+      let start = dayIndices[0], prev = start;
+      for (let k = 1; k <= dayIndices.length; k++) {
+        const d = dayIndices[k];
+        if (d === prev + 1) { prev = d; continue; }
+        ranges.push([start, prev]);
+        start = prev = d;
+      }
+      if (ranges.length > 1 && ranges[0][0] === 0 && ranges[ranges.length - 1][1] === days - 1) {
+        ranges[0][0] = ranges.pop()[0];
+      }
+      const fmt = d => formatDate(addDays(`${year}-01-01`, d), { day: '2-digit', month: '2-digit' });
+      const text = ranges.slice(0, 3).map(([a, b]) => (a === b ? fmt(a) : `${fmt(a)}–${fmt(b)}`));
+      if (ranges.length > 3) text.push('…');
+      return text.join(', ');
+    }
+
+    function describeTrigger(kf) {
+      if (kf.trigger !== 'sun') return kf.time;
+      const off = kf.offsetMinutes || 0;
+      let s = t('sun_' + kf.sunEvent);
+      if (off) s += ` ${off > 0 ? '+' : '−'}${Math.abs(off)} min`;
+      if (kf.notBefore) s += ` ≥ ${kf.notBefore}`;
+      if (kf.notAfter) s += ` ≤ ${kf.notAfter}`;
+      return s;
+    }
 
     // ============================================================================
     // i18n TRANSLATION SYSTEM  
@@ -407,24 +1071,90 @@ const translations = {
     skin_label: "Stil",
     skin_glass: "Glas",
     skin_paper: "Papier",
+
+    // Location & sun
+    location: "Standort",
+    lat_label: "Breitengrad",
+    lon_label: "Längengrad",
+    tz_label: "Zeitzone",
+    loc_from_ha: "Aus Home Assistant",
+    loc_from_browser: "Browser-Standort",
+    loc_help: "Grundlage für sonnenbasierte Keyframes. In Home Assistant wird der dort eingestellte Standort übernommen.",
+    loc_invalid: "Standort unvollständig – Sonnen-Keyframes können nicht berechnet werden.",
+    loc_ha_unavailable: "Home-Assistant-Standort ist hier nicht erreichbar.",
+    loc_browser_failed: "Browser-Standort nicht verfügbar.",
+    trigger_time: "Uhrzeit",
+    trigger_sun: "Sonne",
+    offset_title: "Versatz in Minuten (negativ = früher)",
+    not_before: "frühestens",
+    not_after: "spätestens",
+    event_skipped: "entfällt",
+    resolved_on: "am gewählten Tag",
+    sun_astronomical_dawn: "Astron. Morgendämmerung",
+    sun_nautical_dawn: "Naut. Morgendämmerung",
+    sun_civil_dawn: "Bürgerl. Morgendämmerung",
+    sun_sunrise: "Sonnenaufgang",
+    sun_golden_hour_end: "Ende goldene Stunde",
+    sun_solar_midnight: "Sonnenmitternacht (Tiefststand)",
+    sun_solar_noon: "Sonnenmittag (Höchststand)",
+    sun_golden_hour_start: "Beginn goldene Stunde",
+    sun_sunset: "Sonnenuntergang",
+    sun_civil_dusk: "Bürgerl. Abenddämmerung",
+    sun_nautical_dusk: "Naut. Abenddämmerung",
+    sun_astronomical_dusk: "Astron. Abenddämmerung",
+    info_sun_title: "Sonne:",
+    info_sun: "Keyframe folgt einem Sonnenereignis am Standort, mit Versatz in Minuten und optionalen Grenzen (frühestens/spätestens). Tritt das Ereignis an einem Tag nicht ein (z. B. astronomische Dämmerung im Sommer), gilt die Grenze – ohne Grenze entfällt der Keyframe an diesem Tag.",
+    day_length: "Tageslänge",
+    polar_day: "Polartag",
+    polar_night: "Polarnacht",
+
+    // Year / day view
+    year_title: "Jahresübersicht",
+    year_mode_daylight: "Tageslicht",
+    year_group_artificial: "Kunstlicht",
+    scale_dim: "Helligkeit Kunstlicht",
+    scale_kelvin: "Farbtemperatur Kunstlicht",
+    scale_daylight: "Tageslicht (klarer Himmel, horizontal)",
+    tip_daylight: "Tageslicht (klar)",
+    year_show_sun: "Sonne",
+    year_show_kf: "Keyframes",
+    last_keyframe: "Letzter Keyframe",
+    year_mode_dim: "Helligkeit",
+    year_mode_kelvin: "Farbtemperatur",
+    legend_sun: "Sonnenauf-/untergang",
+    legend_civil: "Bürgerliche Dämmerung",
+    legend_selected: "Gewählter Tag",
+    year_help: "Klicke auf einen Tag, um ihn in der Tagesansicht zu öffnen.",
+    today: "Heute",
+    legend_keyframes: "Keyframe-Zeiten",
+    conflicts_title: "Konflikte:",
+    conflicts_intro: "Diese Keyframes tauschen im Jahr {year} ihre Reihenfolge – je nach Jahreszeit würde mal der eine, mal der andere gelten. Fasse sie zu einer Gruppe zusammen und lege fest, welcher gilt.",
+    overlap_title: "Überlappung",
+    overlap_line: "{y} löst an {n} Tagen ({ranges}) vor {x} aus, sonst umgekehrt. Im Diagramm rot markiert.",
+    overlap_action: "Gruppe bilden",
+    overlap_pill: "Überlappung",
+    legend_overlap: "Konflikt (nicht gruppiert)",
+    skipped_by_rule: "entfällt (Gruppe)",
     
     // Card titles
     settings: "Einstellungen",
     schedule_name_label: "Schedule Name",
     schedule_name_help: "Wird für JSON-Dateinamen und PDF-Titel verwendet",
     keyframes: "Keyframes",
-    preview: "Vorschau",
+    preview: "Tagesansicht",
     export_import: "Export & Import",
     
     // Settings
     step_minutes_label: "Aktualisierung (Minuten)",
     horizon_hours_label: "Vorschau-Zeitraum",
-    wrap_around_label: "Wiederholung",
     
     // Buttons
     add_keyframe: "Keyframe hinzufügen",
     sort_by_time: "Nach Zeit sortieren",
-    load_example: "Beispiel laden",
+    preset_none: "Beispiel laden …",
+    preset_time: "Büroprofil Lichtdusche",
+    preset_sun: "Reine Astrosteuerung",
+    preset_mixed: "Gemischt (Überlappung in Berlin)",
     load_file: "Datei laden",
     save_file: "Als Datei speichern",
     pdf_export: "PDF Export",
@@ -433,13 +1163,33 @@ const translations = {
     import_text: "JSON übernehmen",
     
     // Table headers
-    th_time: "ZEIT",
+    th_time: "ZEIT / AUSLÖSER",
     th_kelvin: "KELVIN",
     th_brightness: "HELLIGKEIT %",
     th_mode: "MODUS",
     th_transition: "TRANSITION (H:M:S)",
     th_direction: "RICHTUNG",
     th_curve: "KURVE",
+    th_group: "GRUPPE",
+    group_title: "Keyframes einer Gruppe haben dieselbe Rolle – pro Tag gilt nur einer (siehe Regel der Gruppe)",
+    group: "Gruppe",
+    group_rule_earliest: "Früheste gilt",
+    group_rule_latest: "Späteste gilt",
+    group_rule_all: "Alle (zeitlich)",
+    group_rule_help_earliest: "Pro Tag löst nur der Keyframe aus, der zuerst kommt; die anderen entfallen.",
+    group_rule_help_latest: "Pro Tag löst nur der Keyframe aus, der zuletzt kommt; die anderen entfallen.",
+    group_rule_help_all: "Alle lösen zeitlich nacheinander aus – der Reihenfolgewechsel ist gewollt.",
+    group_dissolve: "Auflösen",
+    conflict_line: "An {n} Tagen ({ranges}) löst {early} vor {late} aus, sonst umgekehrt.",
+    conflict_action_earliest: "Gruppe: früherer gilt",
+    conflict_action_latest: "Gruppe: späterer gilt",
+    conflict_action_all: "Beide zulassen",
+    hint_title: "Hinweise",
+    hint_mixed_pill: "Gemischte Modi",
+    hint_mixed_modes: "{g} mischt Modi ({modes}). Je nachdem, welcher Keyframe gewinnt, ändert sich der Verlauf davor und danach – am besten allen Mitgliedern denselben Modus geben.",
+    hint_predecessor: "{k} (Interpolate) startet je nach Tag bei einem anderen Keyframe: {list}. Der Verlauf vor {k} ändert sich deshalb im Jahresverlauf.",
+    hint_overnight: "{k} (Interpolate) interpoliert an {n} Tagen über Mitternacht, z. B. {from} → {to} am {date} – die ganze Nacht ändert sich. Soll die Nacht konstant bleiben, {k} auf Transition stellen.",
+    days_short: "Tage",
     
     // Modes
     mode_instant: "Instant",
@@ -475,14 +1225,8 @@ const translations = {
     workflow_step3_detail: "Menü → Integration neu laden",
     
     // Chart
-    chart_brightness: "Helligkeit % (normalisiert)",
-    chart_kelvin: "Kelvin (normalisiert 2000-6500K)",
-    
-    // Stats
-    stats_keyframes: "Keyframes:",
-    stats_kelvin: "Ø Kelvin:",
-    stats_brightness: "Ø Helligkeit:",
-    stats_transition: "Ø Transition:",
+    chart_brightness: "Helligkeit %",
+    chart_kelvin: "Farbtemperatur K",
     
     // Empty state
     empty_message: "Klicke auf \"Keyframe hinzufügen\" oder \"Beispiel laden\"",
@@ -518,8 +1262,6 @@ const translations = {
     hours_24: "24 Stunden",
     hours_48: "48 Stunden",
     hours_72: "72 Stunden",
-    repeat_daily: "Täglich wiederholen",
-    repeat_once: "Einmalig",
     
     // Help texts
     help_step_minutes: "Bestimmt die Häufigkeit der Updates in Home Assistant und die Standard-Transition-Zeit.",
@@ -528,7 +1270,7 @@ const translations = {
     help_transition_note: "(Aktualisierung × 60) Sekunden",
     help_transition_example: "5 Minuten = 300s Transition (außer im Keyframe kürzer angegeben)",
     tip_title: "Tipp:",
-    tip_text: "Die Reihenfolge der Keyframes bestimmt ihre Priorität bei Überschneidungen. Verwende das ⋮⋮ Symbol zum Verschieben."
+    tip_text: "Tauschen Keyframes im Jahresverlauf ihre Reihenfolge (z. B. Sonnenuntergang und 20:00), wird das rot markiert. Fasse solche Keyframes zu einer Gruppe zusammen und lege fest, ob der frühere oder der spätere gilt."
   },
   
   en: {
@@ -541,24 +1283,90 @@ const translations = {
     skin_label: "Style",
     skin_glass: "Glass",
     skin_paper: "Paper",
+
+    // Location & sun
+    location: "Location",
+    lat_label: "Latitude",
+    lon_label: "Longitude",
+    tz_label: "Time zone",
+    loc_from_ha: "From Home Assistant",
+    loc_from_browser: "Browser location",
+    loc_help: "Basis for sun-based keyframes. Inside Home Assistant the location configured there is used.",
+    loc_invalid: "Location incomplete – sun keyframes cannot be calculated.",
+    loc_ha_unavailable: "Home Assistant location is not reachable here.",
+    loc_browser_failed: "Browser location not available.",
+    trigger_time: "Time",
+    trigger_sun: "Sun",
+    offset_title: "Offset in minutes (negative = earlier)",
+    not_before: "not before",
+    not_after: "not after",
+    event_skipped: "skipped",
+    resolved_on: "on the selected day",
+    sun_astronomical_dawn: "Astronomical dawn",
+    sun_nautical_dawn: "Nautical dawn",
+    sun_civil_dawn: "Civil dawn",
+    sun_sunrise: "Sunrise",
+    sun_golden_hour_end: "Golden hour end",
+    sun_solar_midnight: "Solar midnight",
+    sun_solar_noon: "Solar noon",
+    sun_golden_hour_start: "Golden hour start",
+    sun_sunset: "Sunset",
+    sun_civil_dusk: "Civil dusk",
+    sun_nautical_dusk: "Nautical dusk",
+    sun_astronomical_dusk: "Astronomical dusk",
+    info_sun_title: "Sun:",
+    info_sun: "Keyframe follows a sun event at the location, with an offset in minutes and optional bounds (not before/not after). If the event does not occur on a day (e.g. astronomical twilight in summer), the bound applies – without a bound the keyframe is skipped that day.",
+    day_length: "Day length",
+    polar_day: "Polar day",
+    polar_night: "Polar night",
+
+    // Year / day view
+    year_title: "Year overview",
+    year_mode_daylight: "Daylight",
+    year_group_artificial: "Artificial light",
+    scale_dim: "Artificial light brightness",
+    scale_kelvin: "Artificial light colour temperature",
+    scale_daylight: "Daylight (clear sky, horizontal)",
+    tip_daylight: "Daylight (clear)",
+    year_show_sun: "Sun",
+    year_show_kf: "Keyframes",
+    last_keyframe: "Last keyframe",
+    year_mode_dim: "Brightness",
+    year_mode_kelvin: "Colour temperature",
+    legend_sun: "Sunrise/sunset",
+    legend_civil: "Civil twilight",
+    legend_selected: "Selected day",
+    year_help: "Click a day to open it in the day view.",
+    today: "Today",
+    legend_keyframes: "Keyframe times",
+    conflicts_title: "Conflicts:",
+    conflicts_intro: "These keyframes swap their order during {year} – depending on the season one or the other would win. Put them into a group and choose which one applies.",
+    overlap_title: "Overlap",
+    overlap_line: "{y} fires before {x} on {n} days ({ranges}), otherwise the other way round. Marked red in the chart.",
+    overlap_action: "Create group",
+    overlap_pill: "Overlap",
+    legend_overlap: "Conflict (not grouped)",
+    skipped_by_rule: "skipped (group)",
     
     // Card titles
     settings: "Settings",
     schedule_name_label: "Schedule Name",
     schedule_name_help: "Used for JSON filenames and PDF title",
     keyframes: "Keyframes",
-    preview: "Preview",
+    preview: "Day view",
     export_import: "Export & Import",
     
     // Settings
     step_minutes_label: "Update Interval (Minutes)",
     horizon_hours_label: "Preview Duration (Hours)",
-    wrap_around_label: "24h Repeat",
     
     // Buttons
     add_keyframe: "Add Keyframe",
     sort_by_time: "Sort by Time",
-    load_example: "Load Example",
+    preset_none: "Load example …",
+    preset_time: "Office profile light shower",
+    preset_sun: "Sun only",
+    preset_mixed: "Mixed (overlap in Berlin)",
     load_file: "Load File",
     save_file: "Save as File",
     pdf_export: "PDF Export",
@@ -567,13 +1375,33 @@ const translations = {
     import_text: "Import JSON",
     
     // Table headers
-    th_time: "TIME",
+    th_time: "TIME / TRIGGER",
     th_kelvin: "KELVIN",
     th_brightness: "BRIGHTNESS %",
     th_mode: "MODE",
     th_transition: "TRANSITION (H:M:S)",
     th_direction: "DIRECTION",
     th_curve: "CURVE",
+    th_group: "GROUP",
+    group_title: "Keyframes in a group play the same role – only one applies per day (see the group's rule)",
+    group: "Group",
+    group_rule_earliest: "Earliest applies",
+    group_rule_latest: "Latest applies",
+    group_rule_all: "All (chronological)",
+    group_rule_help_earliest: "Each day only the keyframe that comes first fires; the others are skipped.",
+    group_rule_help_latest: "Each day only the keyframe that comes last fires; the others are skipped.",
+    group_rule_help_all: "All fire one after another – the change of order is intended.",
+    group_dissolve: "Dissolve",
+    conflict_line: "On {n} days ({ranges}) {early} fires before {late}, otherwise the other way round.",
+    conflict_action_earliest: "Group: earlier applies",
+    conflict_action_latest: "Group: later applies",
+    conflict_action_all: "Allow both",
+    hint_title: "Hints",
+    hint_mixed_pill: "Mixed modes",
+    hint_mixed_modes: "{g} mixes modes ({modes}). Depending on which keyframe wins, the curve before and after it changes – ideally give all members the same mode.",
+    hint_predecessor: "{k} (Interpolate) starts from a different keyframe depending on the day: {list}. The curve before {k} therefore changes over the year.",
+    hint_overnight: "{k} (Interpolate) interpolates across midnight on {n} days, e.g. {from} → {to} on {date} – the whole night changes. To keep the night constant, set {k} to Transition.",
+    days_short: "days",
     
     // Modes
     mode_instant: "Instant",
@@ -609,14 +1437,8 @@ const translations = {
     workflow_step3_detail: "Menu → Reload Integration",
     
     // Chart
-    chart_brightness: "Brightness % (normalized)",
-    chart_kelvin: "Kelvin (normalized 2000-6500K)",
-    
-    // Stats
-    stats_keyframes: "Keyframes:",
-    stats_kelvin: "Ø Kelvin:",
-    stats_brightness: "Ø Brightness:",
-    stats_transition: "Ø Transition:",
+    chart_brightness: "Brightness %",
+    chart_kelvin: "Colour temperature K",
     
     // Empty state
     empty_message: "Click \"Add Keyframe\" or \"Load Example\"",
@@ -652,8 +1474,6 @@ const translations = {
     hours_24: "24 Hours",
     hours_48: "48 Hours",
     hours_72: "72 Hours",
-    repeat_daily: "Repeat Daily",
-    repeat_once: "Once",
     
     // Help texts
     help_step_minutes: "Determines the frequency of updates in Home Assistant and the default transition time.",
@@ -662,7 +1482,7 @@ const translations = {
     help_transition_note: "(Update Interval × 60) seconds",
     help_transition_example: "5 minutes = 300s transition (unless shorter specified in keyframe)",
     tip_title: "Tip:",
-    tip_text: "The order of keyframes determines their priority when overlapping. Use the ⋮⋮ symbol to reorder."
+    tip_text: "If keyframes swap their order during the year (e.g. sunset and 20:00), this is marked red. Put such keyframes into a group and choose whether the earlier or the later one applies."
   },
   
   es: {
@@ -675,24 +1495,90 @@ const translations = {
     skin_label: "Estilo",
     skin_glass: "Vidrio",
     skin_paper: "Papel",
+
+    // Location & sun
+    location: "Ubicación",
+    lat_label: "Latitud",
+    lon_label: "Longitud",
+    tz_label: "Zona horaria",
+    loc_from_ha: "Desde Home Assistant",
+    loc_from_browser: "Ubicación del navegador",
+    loc_help: "Base para keyframes solares. Dentro de Home Assistant se usa la ubicación configurada allí.",
+    loc_invalid: "Ubicación incompleta – no se pueden calcular los keyframes solares.",
+    loc_ha_unavailable: "La ubicación de Home Assistant no está disponible aquí.",
+    loc_browser_failed: "Ubicación del navegador no disponible.",
+    trigger_time: "Hora",
+    trigger_sun: "Sol",
+    offset_title: "Desfase en minutos (negativo = antes)",
+    not_before: "no antes de",
+    not_after: "no después de",
+    event_skipped: "omitido",
+    resolved_on: "en el día seleccionado",
+    sun_astronomical_dawn: "Alba astronómica",
+    sun_nautical_dawn: "Alba náutica",
+    sun_civil_dawn: "Alba civil",
+    sun_sunrise: "Salida del sol",
+    sun_golden_hour_end: "Fin hora dorada",
+    sun_solar_midnight: "Medianoche solar",
+    sun_solar_noon: "Mediodía solar",
+    sun_golden_hour_start: "Inicio hora dorada",
+    sun_sunset: "Puesta del sol",
+    sun_civil_dusk: "Crepúsculo civil",
+    sun_nautical_dusk: "Crepúsculo náutico",
+    sun_astronomical_dusk: "Crepúsculo astronómico",
+    info_sun_title: "Sol:",
+    info_sun: "El keyframe sigue un evento solar en la ubicación, con desfase en minutos y límites opcionales (no antes de/no después de). Si el evento no ocurre un día (p. ej. crepúsculo astronómico en verano), se aplica el límite – sin límite el keyframe se omite ese día.",
+    day_length: "Duración del día",
+    polar_day: "Día polar",
+    polar_night: "Noche polar",
+
+    // Year / day view
+    year_title: "Vista anual",
+    year_mode_daylight: "Luz diurna",
+    year_group_artificial: "Luz artificial",
+    scale_dim: "Brillo luz artificial",
+    scale_kelvin: "Temperatura de color luz artificial",
+    scale_daylight: "Luz diurna (cielo despejado, horizontal)",
+    tip_daylight: "Luz diurna (despejado)",
+    year_show_sun: "Sol",
+    year_show_kf: "Keyframes",
+    last_keyframe: "Último keyframe",
+    year_mode_dim: "Brillo",
+    year_mode_kelvin: "Temperatura de color",
+    legend_sun: "Salida/puesta del sol",
+    legend_civil: "Crepúsculo civil",
+    legend_selected: "Día seleccionado",
+    year_help: "Haz clic en un día para abrirlo en la vista diaria.",
+    today: "Hoy",
+    legend_keyframes: "Horas de keyframes",
+    conflicts_title: "Conflictos:",
+    conflicts_intro: "Estos keyframes cambian su orden durante {year} – según la estación prevalecería uno u otro. Agrúpalos y elige cuál se aplica.",
+    overlap_title: "Solapamiento",
+    overlap_line: "{y} se activa antes de {x} durante {n} días ({ranges}); el resto del año, al revés. Marcado en rojo en el gráfico.",
+    overlap_action: "Crear grupo",
+    overlap_pill: "Solapamiento",
+    legend_overlap: "Conflicto (sin agrupar)",
+    skipped_by_rule: "omitido (grupo)",
     
     // Card titles
     settings: "Configuración",
     schedule_name_label: "Nombre del horario",
     schedule_name_help: "Se utiliza para nombres de archivos JSON y título de PDF",
     keyframes: "Keyframes",
-    preview: "Vista Previa",
+    preview: "Vista diaria",
     export_import: "Exportar e Importar",
     
     // Settings
     step_minutes_label: "Intervalo de Actualización (Minutos)",
     horizon_hours_label: "Duración de Vista Previa (Horas)",
-    wrap_around_label: "Repetición 24h",
     
     // Buttons
     add_keyframe: "Añadir Keyframe",
     sort_by_time: "Ordenar por Tiempo",
-    load_example: "Cargar Ejemplo",
+    preset_none: "Cargar ejemplo …",
+    preset_time: "Perfil de oficina ducha de luz",
+    preset_sun: "Solo control solar",
+    preset_mixed: "Mixto (solapamiento en Berlín)",
     load_file: "Cargar Archivo",
     save_file: "Guardar como Archivo",
     pdf_export: "Exportar PDF",
@@ -701,13 +1587,33 @@ const translations = {
     import_text: "Importar JSON",
     
     // Table headers
-    th_time: "TIEMPO",
+    th_time: "TIEMPO / DISPARADOR",
     th_kelvin: "KELVIN",
     th_brightness: "BRILLO %",
     th_mode: "MODO",
     th_transition: "TRANSICIÓN (H:M:S)",
     th_direction: "DIRECCIÓN",
     th_curve: "CURVA",
+    th_group: "GRUPO",
+    group_title: "Los keyframes de un grupo tienen la misma función – cada día solo se aplica uno (ver la regla del grupo)",
+    group: "Grupo",
+    group_rule_earliest: "El primero se aplica",
+    group_rule_latest: "El último se aplica",
+    group_rule_all: "Todos (cronológico)",
+    group_rule_help_earliest: "Cada día solo se activa el keyframe que llega primero; los demás se omiten.",
+    group_rule_help_latest: "Cada día solo se activa el keyframe que llega último; los demás se omiten.",
+    group_rule_help_all: "Todos se activan uno tras otro – el cambio de orden es intencionado.",
+    group_dissolve: "Disolver",
+    conflict_line: "Durante {n} días ({ranges}) {early} se activa antes de {late}; el resto del año, al revés.",
+    conflict_action_earliest: "Grupo: el anterior se aplica",
+    conflict_action_latest: "Grupo: el posterior se aplica",
+    conflict_action_all: "Permitir ambos",
+    hint_title: "Avisos",
+    hint_mixed_pill: "Modos mezclados",
+    hint_mixed_modes: "{g} mezcla modos ({modes}). Según qué keyframe gane, cambia la curva antes y después – mejor dar a todos los miembros el mismo modo.",
+    hint_predecessor: "{k} (Interpolar) empieza desde un keyframe distinto según el día: {list}. Por eso la curva antes de {k} cambia a lo largo del año.",
+    hint_overnight: "{k} (Interpolar) interpola a través de la medianoche durante {n} días, p. ej. {from} → {to} el {date} – cambia toda la noche. Para mantener la noche constante, pon {k} en Transición.",
+    days_short: "días",
     
     // Modes
     mode_instant: "Instantáneo",
@@ -743,14 +1649,8 @@ const translations = {
     workflow_step3_detail: "Menú → Recargar Integración",
     
     // Chart
-    chart_brightness: "Brillo % (normalizado)",
-    chart_kelvin: "Kelvin (normalizado 2000-6500K)",
-    
-    // Stats
-    stats_keyframes: "Keyframes:",
-    stats_kelvin: "Ø Kelvin:",
-    stats_brightness: "Ø Brillo:",
-    stats_transition: "Ø Transición:",
+    chart_brightness: "Brillo %",
+    chart_kelvin: "Temperatura de color K",
     
     // Empty state
     empty_message: "Haz clic en \"Añadir Keyframe\" o \"Cargar Ejemplo\"",
@@ -786,8 +1686,6 @@ const translations = {
     hours_24: "24 Horas",
     hours_48: "48 Horas",
     hours_72: "72 Horas",
-    repeat_daily: "Repetir Diariamente",
-    repeat_once: "Una Vez",
     
     // Help texts
     help_step_minutes: "Determina la frecuencia de actualizaciones en Home Assistant y el tiempo de transición predeterminado.",
@@ -796,7 +1694,7 @@ const translations = {
     help_transition_note: "(Intervalo de Actualización × 60) segundos",
     help_transition_example: "5 minutos = 300s transición (a menos que se especifique más corto en el keyframe)",
     tip_title: "Consejo:",
-    tip_text: "El orden de los keyframes determina su prioridad cuando se superponen. Usa el símbolo ⋮⋮ para reordenar."
+    tip_text: "Si los keyframes cambian su orden durante el año (p. ej. la puesta del sol y las 20:00), se marca en rojo. Agrupa esos keyframes y elige si se aplica el anterior o el posterior."
 
   }
 };
@@ -821,6 +1719,8 @@ const translations = {
         • <strong>${t('pdf_curve')}</strong>: ${t('info_transition_curve')}<br>
         <span class="lkl-pill">${t('mode_interpolate')}</span> ${t('info_interpolate')}<br>
         • <strong>${t('pdf_curve')}</strong>: ${t('info_interpolate_curve')}<br>
+        <br>
+        <strong>${t('info_sun_title')}</strong> ${t('info_sun')}<br>
         <br>
         <strong>${t('info_transition_time')}</strong><br>
         • <strong>${t('mode_interpolate')}:</strong> ${t('info_interpolate_time')}<br>
@@ -849,12 +1749,6 @@ const translations = {
       if (opt24) opt24.textContent = t('hours_24');
       if (opt48) opt48.textContent = t('hours_48');
       if (opt72) opt72.textContent = t('hours_72');
-      
-      // Update wrap around options
-      const optDaily = document.getElementById('opt-repeat-daily');
-      const optOnce = document.getElementById('opt-repeat-once');
-      if (optDaily) optDaily.textContent = t('repeat_daily');
-      if (optOnce) optOnce.textContent = t('repeat_once');
     }
     
     function updateTip() {
@@ -896,16 +1790,38 @@ const translations = {
       document.getElementById('skinGlass').textContent = t('skin_glass');
       document.getElementById('skinPaper').textContent = t('skin_paper');
 
+      // Location, year and day view
+      const setText = (id, key) => { document.getElementById(id).textContent = t(key); };
+      setText('label-location', 'location');
+      setText('label-lat', 'lat_label');
+      setText('label-lon', 'lon_label');
+      setText('label-tz', 'tz_label');
+      setText('locFromHaBtn', 'loc_from_ha');
+      setText('locFromBrowserBtn', 'loc_from_browser');
+      setText('card-title-year', 'year_title');
+      setText('yearModeDaylight', 'year_mode_daylight');
+      setText('yearGroupArtificial', 'year_group_artificial');
+      setText('yearModeDim', 'year_mode_dim');
+      setText('yearModeKelvin', 'year_mode_kelvin');
+      setText('yearShowSun', 'year_show_sun');
+      setText('yearShowKf', 'year_show_kf');
+      setText('legend-sun', 'legend_sun');
+      setText('legend-civil', 'legend_civil');
+      setText('legend-selected', 'legend_selected');
+      setText('legend-keyframes', 'legend_keyframes');
+      setText('legend-overlap', 'legend_overlap');
+      setText('year-help', 'year_help');
+      setText('todayBtn', 'today');
+      updateLocationHelp();
+
       // Update settings labels
       const labelScheduleName = document.getElementById('label-schedule-name');
       const labelStepMinutes = document.getElementById('label-step-minutes');
       const labelHorizonHours = document.getElementById('label-horizon-hours');
-      const labelWrapAround = document.getElementById('label-wrap-around');
       
       if (labelScheduleName) labelScheduleName.textContent = t('schedule_name_label');
       if (labelStepMinutes) labelStepMinutes.textContent = t('step_minutes_label');
       if (labelHorizonHours) labelHorizonHours.textContent = t('horizon_hours_label');
-      if (labelWrapAround) labelWrapAround.textContent = t('wrap_around_label');
       
       // Update dropdowns
       updateDropdowns();
@@ -930,7 +1846,9 @@ const translations = {
       // Update all button texts
       document.getElementById('addKeyframeBtn').textContent = t('add_keyframe');
       document.getElementById('sortByTimeBtn').textContent = t('sort_by_time');
-      document.getElementById('loadPresetBtn').textContent = t('load_example');
+      PRESET_NAMES.concat('none').forEach(name => {
+        document.getElementById('opt-preset-' + name).textContent = t('preset_' + name);
+      });
       document.getElementById('loadFileBtn').textContent = t('load_file');
       document.getElementById('downloadJsonBtn').textContent = t('save_file');
       document.getElementById('downloadPdfBtn').textContent = t('pdf_export');
@@ -963,7 +1881,7 @@ const translations = {
       
       // Re-render everything with new language
       renderKeyframes();
-      renderChart();
+      renderViews();
       updateJsonOutput();
     }
     
@@ -972,18 +1890,30 @@ const translations = {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
-          state = JSON.parse(saved);
-          updateUI();
+          state = { ...state, ...JSON.parse(saved) };
+          // Fields of removed features (one-shot mode, pairwise rules)
+          delete state.wrapAround;
+          delete state.startDateTime;
+          delete state.conflictRules;
+          state.keyframes = (state.keyframes || []).map(normalizeKeyframe);
+          ensureUniqueIds();
+          pruneGroups();
         } else {
           // Load example preset on first visit
-          loadPreset('example');
+          state.keyframes = PRESETS.time.map(normalizeKeyframe);
+          state.scheduleName = t('preset_time');
         }
       } catch (e) {
         console.error('Failed to load state:', e);
       }
+      // Inside Home Assistant, start from its configured location.
+      if (!state.location) state.location = locationFromHa();
+      saveState();
+      updateUI();
     }
 
     function saveState() {
+      invalidateResolved();
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (e) {
@@ -994,16 +1924,91 @@ const translations = {
     function updateUI() {
       document.getElementById('stepMinutes').value = state.stepMinutes;
       document.getElementById('horizonHours').value = state.horizonHours;
-      document.getElementById('wrapAround').value = state.wrapAround;
       document.getElementById('scheduleName').value = state.scheduleName || 'My Schedule';
+      updateLocationFields();
       renderKeyframes();
-      renderChart();
+      renderViews();
       updateJsonOutput();
     }
-    
+
+    /** Everything that depends on the simulation. */
+    function renderViews() {
+      renderSunInfo();
+      renderChart();
+      renderYearView();
+    }
+
     function updateScheduleName(value) {
       state.scheduleName = value.trim() || 'My Schedule';
       saveState();
+    }
+
+    // ============================================================================
+    // LOCATION
+    // ============================================================================
+
+    /** Location configured in Home Assistant, read from the parent frame (the
+        panel is a same-origin iframe). Null outside HA or if not accessible. */
+    function locationFromHa() {
+      try {
+        const cfg = window.parent !== window &&
+          window.parent.document.querySelector('home-assistant')?.hass?.config;
+        if (cfg && Number.isFinite(cfg.latitude) && Number.isFinite(cfg.longitude)) {
+          return { lat: cfg.latitude, lon: cfg.longitude, tz: cfg.time_zone || DEFAULT_LOCATION.tz };
+        }
+      } catch (e) { /* cross-origin or not inside HA */ }
+      return null;
+    }
+
+    function setLocation(loc) {
+      state.location = loc;
+      saveState();
+      updateUI();
+    }
+
+    function updateLocationFields() {
+      const loc = state.location || DEFAULT_LOCATION;
+      const set = (id, v) => {
+        const el = document.getElementById(id);
+        if (document.activeElement !== el) el.value = v;
+      };
+      set('locLat', loc.lat);
+      set('locLon', loc.lon);
+      set('locTz', loc.tz);
+      document.getElementById('locFromHaBtn').disabled = !locationFromHa();
+      updateLocationHelp();
+    }
+
+    function updateLocationHelp(message) {
+      const el = document.getElementById('help-location');
+      if (!el) return;
+      el.textContent = message || (getLocation() ? t('loc_help') : t('loc_invalid'));
+    }
+
+    function readLocationFields() {
+      const lat = parseFloat(document.getElementById('locLat').value);
+      const lon = parseFloat(document.getElementById('locLon').value);
+      const tz = document.getElementById('locTz').value.trim();
+      setLocation({ lat, lon, tz });
+    }
+
+    function locationFromBrowser() {
+      if (!navigator.geolocation) { updateLocationHelp(t('loc_browser_failed')); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => setLocation({
+          lat: Math.round(pos.coords.latitude * 10000) / 10000,
+          lon: Math.round(pos.coords.longitude * 10000) / 10000,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_LOCATION.tz
+        }),
+        () => updateLocationHelp(t('loc_browser_failed')),
+        { timeout: 10000 }
+      );
+    }
+
+    function fillTimeZoneList() {
+      if (!Intl.supportedValuesOf) return;
+      document.getElementById('tzList').innerHTML =
+        Intl.supportedValuesOf('timeZone').map(tz => `<option value="${tz}">`).join('');
     }
 
     // ============================================================================
@@ -1013,8 +2018,8 @@ const translations = {
     function addKeyframe() {
       const now = new Date();
       const time = `${pad2(now.getHours())}:00`;
-      
-      state.keyframes.push({
+
+      state.keyframes.push(normalizeKeyframe({
         time,
         kelvin: 4000,
         dim: 80,
@@ -1022,8 +2027,8 @@ const translations = {
         transitionSeconds: 300,
         transitionDirection: 'after',
         curve: 'linear'
-      });
-      
+      }));
+
       saveState();
       updateUI();
     }
@@ -1031,45 +2036,54 @@ const translations = {
     function deleteKeyframe(index) {
       if (confirm('Keyframe wirklich löschen?')) {
         state.keyframes.splice(index, 1);
+        pruneGroups();
         saveState();
         updateUI();
       }
     }
 
     function updateKeyframe(index, field, value) {
-      if (!state.keyframes[index]) return;
-      
+      const kf = state.keyframes[index];
+      if (!kf) return;
+
       if (field === 'kelvin') {
         value = clamp(parseInt(value) || 2000, 2000, 6500);
       } else if (field === 'dim') {
         value = clamp(parseInt(value) || 0, 0, 100);
+      } else if (field === 'offsetMinutes') {
+        value = clamp(parseInt(value) || 0, -720, 720);
+      } else if (field === 'trigger' && value === 'time' && kf.trigger === 'sun') {
+        // Switching back to a fixed time: keep the time it had on the viewed day
+        const m = resolveKeyframeMinutes(kf, viewDate);
+        if (m != null) kf.time = formatTime(m);
       } else if (field === 'transitionSeconds') {
         const numValue = parseInt(value) || 0;
         // If negative value, convert to positive and set direction to "before"
         if (numValue < 0) {
-          state.keyframes[index].transitionSeconds = Math.abs(numValue);
-          state.keyframes[index].transitionDirection = 'before';
+          kf.transitionSeconds = Math.abs(numValue);
+          kf.transitionDirection = 'before';
           saveState();
           updateUI();
           return;
         }
         value = Math.max(0, numValue);
       }
-      
-      state.keyframes[index][field] = value;
+
+      kf[field] = value;
+      if (field === 'group') pruneGroups();
       saveState();
-      
+
       // For text input fields: don't re-render table, only update chart/json
       // This preserves focus in input fields
       if (field === 'time' || field === 'kelvin' || field === 'dim') {
         // Debounced chart update to avoid too many updates while typing
         if (window.chartUpdateTimeout) clearTimeout(window.chartUpdateTimeout);
         window.chartUpdateTimeout = setTimeout(() => {
-          renderChart();
+          renderViews();
           updateJsonOutput();
         }, 300); // Wait 300ms after last keystroke
       } else {
-        // For dropdowns (mode, curve, direction): full update is OK
+        // For dropdowns and trigger fields: full update is OK
         updateUI();
       }
     }
@@ -1079,9 +2093,9 @@ const translations = {
       const hours = Math.max(0, Math.min(23, parseInt(inputs[0].value) || 0));
       const minutes = Math.max(0, Math.min(59, parseInt(inputs[1].value) || 0));
       const seconds = Math.max(0, Math.min(59, parseInt(inputs[2].value) || 0));
-      
+
       const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-      
+
       state.keyframes[index].transitionSeconds = totalSeconds;
       saveState();
       updateUI();
@@ -1096,24 +2110,197 @@ const translations = {
     }
 
     function sortKeyframesByTime() {
-      state.keyframes.sort((a, b) => parseTime(a.time) - parseTime(b.time));
+      // Sun keyframes sort by their time on the viewed day; skipped ones go last.
+      const key = kf => resolveKeyframeMinutes(kf, viewDate) ?? Infinity;
+      state.keyframes.sort((a, b) => key(a) - key(b));
       saveState();
       updateUI();
     }
 
     function loadPreset(presetName) {
       if (PRESETS[presetName]) {
-        state.keyframes = JSON.parse(JSON.stringify(PRESETS[presetName]));
+        state.keyframes = PRESETS[presetName].map(normalizeKeyframe);
+        state.scheduleName = t('preset_' + presetName);   // file name and PDF title follow the example
+        state.groupRules = {};   // groups belong to the replaced keyframes
         saveState();
         updateUI();
       }
+    }
+
+    function setViewDate(dateStr) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+      viewDate = dateStr;
+      document.getElementById('viewDate').value = viewDate;
+      renderKeyframes();   // resolved times in the table refer to viewDate
+      renderViews();
     }
 
     // ============================================================================
     // RENDERING
     // ============================================================================
 
+    function renderTriggerCell(kf, index) {
+      const triggerSelect = `
+        <select class="lkl-select" onchange="updateKeyframe(${index}, 'trigger', this.value)">
+          <option value="time" ${kf.trigger !== 'sun' ? 'selected' : ''}>${t('trigger_time')}</option>
+          <option value="sun" ${kf.trigger === 'sun' ? 'selected' : ''}>${t('trigger_sun')}</option>
+        </select>`;
+
+      const resolved = resolveKeyframeMinutes(kf, viewDate);
+      const skippedByRule = resolved != null && !firesOn(kf, viewDate);
+      const rulePill = `<span class="lkl-pill is-warn" title="${t('resolved_on')}">${t('skipped_by_rule')}</span>`;
+
+      if (kf.trigger !== 'sun') {
+        return `
+          <div class="trigger">
+            ${triggerSelect}
+            <input class="lkl-input" type="time" value="${kf.time}"
+                   oninput="updateKeyframe(${index}, 'time', this.value)">
+            ${skippedByRule ? rulePill : ''}
+          </div>`;
+      }
+
+      const eventOptions = KfAstro.EVENT_NAMES.map(name =>
+        `<option value="${name}" ${kf.sunEvent === name ? 'selected' : ''}>${t('sun_' + name)}</option>`
+      ).join('');
+
+      const resolvedPill = resolved == null
+        ? `<span class="lkl-pill is-warn" title="${t('resolved_on')}">${t('event_skipped')}</span>`
+        : skippedByRule ? rulePill
+        : `<span class="lkl-pill is-accent lkl-mono" title="${t('resolved_on')}">→ ${formatTime(resolved)}</span>`;
+
+      return `
+        <div class="trigger">
+          ${triggerSelect}
+          <select class="lkl-select event-select" onchange="updateKeyframe(${index}, 'sunEvent', this.value)">
+            ${eventOptions}
+          </select>
+          <input class="lkl-input offset" type="number" step="5" min="-720" max="720"
+                 value="${kf.offsetMinutes || 0}" title="${t('offset_title')}"
+                 onchange="updateKeyframe(${index}, 'offsetMinutes', this.value)">
+          <span class="trigger-label">min</span>
+          ${resolvedPill}
+        </div>
+        <div class="trigger">
+          <span class="trigger-label">${t('not_before')}</span>
+          <input class="lkl-input bound" type="time" value="${kf.notBefore || ''}"
+                 onchange="updateKeyframe(${index}, 'notBefore', this.value)">
+          <span class="trigger-label">${t('not_after')}</span>
+          <input class="lkl-input bound" type="time" value="${kf.notAfter || ''}"
+                 onchange="updateKeyframe(${index}, 'notAfter', this.value)">
+        </div>`;
+    }
+
+    /**
+     * Below the table: the keyframe groups with their rule, and the open
+     * conflicts (pairs that swap order and are not grouped) with one-click
+     * actions to group them.
+     */
+    function renderConflicts() {
+      const el = document.getElementById('conflictsContainer');
+      const groups = listGroups();
+      const pairs = state.keyframes.length > 1 ? analyzeConflicts() : [];
+      const hints = state.keyframes.length > 1 ? analyzeHints() : [];
+      if (!groups.length && !pairs.length && !hints.length) { el.innerHTML = ''; return; }
+
+      const year = parseDate(viewDate).y;
+      const num = i => `#${i + 1}`;
+      const kfText = i => `<strong>${num(i)}</strong> ${describeTrigger(state.keyframes[i])}`;
+      const ruleChips = (groupId, current) => GROUP_RULES.map(rule => `
+        <button class="lkl-chip is-compact ${current === rule ? 'is-active' : ''}"
+                onclick="setGroupRule('${groupId}', '${rule}')">${t('group_rule_' + rule)}</button>`).join('');
+
+      let html = '';
+
+      // Hints: setups that silently change the curve over the year
+      if (hints.length) {
+        const modeName = m => t('mode_' + m);
+        const hintText = h => {
+          if (h.type === 'mixedModes') {
+            return t('hint_mixed_modes')
+              .replace('{g}', `<strong>${t('group')} ${h.group}</strong>`)
+              .replace('{modes}', h.modes.map(modeName).join(', '));
+          }
+          if (h.type === 'predecessor') {
+            return t('hint_predecessor')
+              .replace(/\{k\}/g, `<strong>${num(h.kf)}</strong>`)
+              .replace('{list}', h.preds.map(p => `${num(p.pred)} (${p.days} ${t('days_short')})`).join(', '));
+          }
+          return t('hint_overnight')
+            .replace(/\{k\}/g, `<strong>${num(h.kf)}</strong>`)
+            .replace('{n}', h.days)
+            .replace('{from}', formatTime(h.example.from))
+            .replace('{to}', formatTime(h.example.to))
+            .replace('{date}', formatDate(h.example.date, { day: '2-digit', month: '2-digit' }));
+        };
+        html += `
+          <div class="lkl-banner is-warn spaced hints">
+            <strong>${t('hint_title')}:</strong>
+            <ul>${hints.map(h => `<li>${hintText(h)}</li>`).join('')}</ul>
+          </div>`;
+      }
+
+      // Groups
+      groups.forEach(g => {
+        const mixed = new Set(g.members.map(i => state.keyframes[i].mode)).size > 1;
+        html += `
+          <div class="group-box">
+            <div class="conflict-row">
+              <div>
+                <span class="lkl-pill is-accent">${t('group')} ${g.id}</span>
+                ${mixed ? `<span class="lkl-pill is-warn">${t('hint_mixed_pill')}</span>` : ''}
+                ${g.members.map(kfText).join(' · ')}
+                <div class="lkl-meta">${t('group_rule_help_' + g.rule)}</div>
+              </div>
+              <div class="lkl-chip-row">
+                ${ruleChips(g.id, g.rule)}
+                <button class="lkl-btn is-quiet is-small" onclick="dissolveGroup('${g.id}')">${t('group_dissolve')}</button>
+              </div>
+            </div>
+          </div>`;
+      });
+
+      // Open conflicts
+      if (pairs.length) {
+        html += `
+          <details class="conflicts" ${conflictsOpen ? 'open' : ''}>
+            <summary class="has-overlap">
+              <span class="lkl-pill is-danger">${pairs.length}</span>
+              ${t('conflicts_title').replace(/:$/, '')}
+            </summary>
+            <div class="lkl-banner is-danger">${t('conflicts_intro').replace('{year}', year)}</div>
+            ${pairs.map(p => `
+              <div class="conflict-pair">
+                <div class="conflict-head">
+                  ${kfText(Math.min(p.i, p.j))} <span class="conflict-vs">⇄</span> ${kfText(Math.max(p.i, p.j))}
+                </div>
+                <div class="conflict-row is-overlap">
+                  <div>
+                    ${t('conflict_line')
+                      .replace('{early}', `<strong>${num(p.early)}</strong>`)
+                      .replace('{late}', `<strong>${num(p.late)}</strong>`)
+                      .replace('{n}', p.overlapDays.length)
+                      .replace('{ranges}', formatDayRanges(p.overlapDays, year))}
+                  </div>
+                  <div class="lkl-chip-row">
+                    ${GROUP_RULES.map(rule => `
+                      <button class="lkl-chip is-compact" onclick="groupPair(${p.i}, ${p.j}, '${rule}')">${t('conflict_action_' + rule)}</button>`).join('')}
+                  </div>
+                </div>
+              </div>`).join('')}
+          </details>`;
+      }
+
+      el.innerHTML = html;
+      const details = el.querySelector('details');
+      if (details) details.addEventListener('toggle', e => { conflictsOpen = e.target.open; });
+    }
+
+    // The conflict list is re-rendered on every edit; keep it open/closed as the user left it.
+    let conflictsOpen = false;
+
     function renderKeyframes() {
+      renderConflicts();
       const container = document.getElementById('keyframesContainer');
       
       if (state.keyframes.length === 0) {
@@ -1132,7 +2319,8 @@ const translations = {
             <tr>
               <th style="width: 40px;"></th>
               <th style="width: 40px;">#</th>
-              <th style="width: 100px;">${t('th_time')}</th>
+              <th style="width: 60px;">${t('th_group')}</th>
+              <th>${t('th_time')}</th>
               <th style="width: 100px;">${t('th_kelvin')}</th>
               <th style="width: 100px;">${t('th_brightness')}</th>
               <th style="width: 120px;">${t('th_mode')}</th>
@@ -1154,9 +2342,12 @@ const translations = {
             <td><span class="drag-handle">⋮⋮</span></td>
             <td><span class="row-number">${index + 1}</span></td>
             <td>
-              <input class="lkl-input" type="time" value="${kf.time}"
-                     oninput="updateKeyframe(${index}, 'time', this.value)">
+              <select class="lkl-select group-select" title="${t('group_title')}" onchange="updateKeyframe(${index}, 'group', this.value)">
+                <option value="" ${kf.group ? '' : 'selected'}>–</option>
+                ${GROUP_IDS.map(id => `<option value="${id}" ${kf.group === id ? 'selected' : ''}>${id}</option>`).join('')}
+              </select>
             </td>
+            <td class="trigger-td">${renderTriggerCell(kf, index)}</td>
             <td>
               <input class="lkl-input" type="number" min="2000" max="6500" step="100"
                      value="${kf.kelvin}"
@@ -1273,13 +2464,13 @@ const translations = {
     // SCHEDULER LOGIC
     // ============================================================================
 
-    function evaluateSchedule(timeMinutes) {
-      if (state.keyframes.length === 0) {
+    function evaluateSchedule(timeMinutes, keyframes = state.keyframes) {
+      if (keyframes.length === 0) {
         return { kelvin: 4000, dim: 50, transition: 300 };
       }
 
       // Sort by time for evaluation
-      const sorted = [...state.keyframes].sort((a, b) => parseTime(a.time) - parseTime(b.time));
+      const sorted = [...keyframes].sort((a, b) => parseTime(a.time) - parseTime(b.time));
       
       // Find relevant keyframes
       let prevKf = null;
@@ -1297,13 +2488,31 @@ const translations = {
         }
       }
 
-      // Wrap around handling
-      if (state.wrapAround) {
-        if (!prevKf) {
-          prevKf = { ...sorted[sorted.length - 1], timeMinutes: parseTime(sorted[sorted.length - 1].time) - 1440 };
-        }
-        if (!nextKf) {
-          nextKf = { ...sorted[0], timeMinutes: parseTime(sorted[0].time) + 1440 };
+      // Wrap around midnight — every schedule is a daily profile. Wrapped
+      // keyframes keep their index in `sorted` (used by the interpolate
+      // branch to look at the keyframes around them).
+      if (!prevKf) {
+        prevKf = { ...sorted[sorted.length - 1], timeMinutes: parseTime(sorted[sorted.length - 1].time) - 1440, index: sorted.length - 1 };
+      }
+      if (!nextKf) {
+        nextKf = { ...sorted[0], timeMinutes: parseTime(sorted[0].time) + 1440, index: 0 };
+      }
+
+      // A "before" transition of the NEXT keyframe starts ahead of its time
+      // and already runs while the previous keyframe is still current. Blend
+      // from the value at the window start to the next keyframe's target
+      // (the HA coordinator steps through the same window).
+      if (nextKf && nextKf.mode === 'transition' && nextKf.transitionDirection === 'before') {
+        const windowStart = nextKf.timeMinutes - nextKf.transitionSeconds / 60;
+        if (nextKf.transitionSeconds > 0 && timeMinutes >= windowStart) {
+          const from = evaluateSchedule(windowStart - 0.1, keyframes);
+          const t = clamp((timeMinutes - windowStart) / (nextKf.timeMinutes - windowStart), 0, 1);
+          const progress = nextKf.curve === 'sinus' ? easeSinus(t) : t;
+          return {
+            kelvin: lerp(from.kelvin, nextKf.kelvin, progress),
+            dim: lerp(from.dim, nextKf.dim, progress),
+            transition: nextKf.transitionSeconds
+          };
         }
       }
 
@@ -1347,7 +2556,7 @@ const translations = {
           const t = (timeMinutes - transitionStart) / (transitionEnd - transitionStart);
           const progress = prevKf.curve === 'sinus' ? easeSinus(t) : t;
           
-          const beforeValue = evaluateSchedule(transitionStart - 0.1);
+          const beforeValue = evaluateSchedule(transitionStart - 0.1, keyframes);
           
           return {
             kelvin: lerp(beforeValue.kelvin, prevKf.kelvin, progress),
@@ -1358,49 +2567,26 @@ const translations = {
         
         // After transition is complete
         if (timeMinutes >= transitionEnd) {
-          // Check if NEXT keyframe is interpolate
-          // If yes, interpolate to it from this transition's end
-          const prevIndex = prevKf.index;
-          
-          // Find next interpolate keyframe
-          let nextInterpolateKf = null;
-          let nextInterpolateTime = null;
-          
-          for (let i = prevIndex + 1; i < sorted.length; i++) {
-            if (sorted[i].mode === 'interpolate') {
-              nextInterpolateKf = sorted[i];
-              nextInterpolateTime = parseTime(nextInterpolateKf.time);
-              break;
-            }
-          }
-          
-          // Wrap-around
-          if (!nextInterpolateKf && state.wrapAround) {
-            for (let i = 0; i < prevIndex; i++) {
-              if (sorted[i].mode === 'interpolate') {
-                nextInterpolateKf = sorted[i];
-                nextInterpolateTime = parseTime(nextInterpolateKf.time) + 1440;
-                break;
-              }
-            }
-          }
-          
-          // If next is interpolate, interpolate to it
-          if (nextInterpolateKf && timeMinutes < nextInterpolateTime) {
+          // Interpolate from the end of this transition only if the IMMEDIATELY
+          // following keyframe is an interpolate one, using that keyframe's
+          // curve — the same rule as the Home Assistant integration
+          // (scheduler.py, _evaluate_transition). Any other keyframe in between
+          // takes over at its own time, so the value is held until then.
+          if (nextKf && nextKf.mode === 'interpolate' && timeMinutes < nextKf.timeMinutes) {
             const startTime = transitionEnd;
-            const endTime = nextInterpolateTime;
+            const endTime = nextKf.timeMinutes;
             const duration = endTime - startTime;
             const elapsed = timeMinutes - startTime;
-            const t = clamp(elapsed / duration, 0, 1);
-            const progress = prevKf.curve === 'sinus' ? easeSinus(t) : t;
-            
+            const t = duration > 0 ? clamp(elapsed / duration, 0, 1) : 1;
+            const progress = nextKf.curve === 'sinus' ? easeSinus(t) : t;
+
             return {
-              kelvin: lerp(prevKf.kelvin, nextInterpolateKf.kelvin, progress),
-              dim: lerp(prevKf.dim, nextInterpolateKf.dim, progress),
+              kelvin: lerp(prevKf.kelvin, nextKf.kelvin, progress),
+              dim: lerp(prevKf.dim, nextKf.dim, progress),
               transition: state.stepMinutes * 60
             };
           }
-          
+
           // No next interpolate or already past it - hold value
           return { 
             kelvin: prevKf.kelvin, 
@@ -1571,7 +2757,14 @@ const translations = {
     function chartPalette() {
       const cs = getComputedStyle(document.documentElement);
       const token = name => cs.getPropertyValue(name).trim();
+      // Night shade: by day a trace of the text colour, at night a pull
+      // towards the room's black (darkening is free at night, see style guide).
+      const isNight = document.documentElement.dataset.theme === 'night';
       return {
+        warn: token('--lkl-warn'),
+        danger: token('--lkl-danger'),
+        nightShade: isNight ? token('--lkl-bg-b') : token('--lkl-text'),
+        nightAlpha: isNight ? 0.55 : 0.07,
         accent: token('--lkl-accent'),
         accentRgb: token('--lkl-accent-rgb'),
         secondary: token('--lkl-text-2'),
@@ -1585,15 +2778,66 @@ const translations = {
       };
     }
 
+    /** Simulated output at wall-clock minutes of a given local day. */
+    function simulateAt(dateStr, minutes) {
+      return evaluateSchedule(minutes, resolveKeyframes(dateStr));
+    }
+
+    /** Chart.js plugin: shades night and twilight behind the curves, from the
+        actual sun altitude of each sample (full shade below -12°). */
+    /** Chart.js plugin: red dashed markers at keyframes that overlap on a day. */
+    const overlapMarksPlugin = {
+      id: 'overlapMarks',
+      afterDatasetsDraw(c, args, opts) {
+        if (!opts || !opts.marks || !opts.marks.length) return;
+        const { ctx, chartArea: area, scales: { x } } = c;
+        ctx.save();
+        ctx.strokeStyle = opts.color;
+        ctx.fillStyle = opts.color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.font = `600 10px ${opts.font}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        opts.marks.forEach(m => {
+          const px = x.getPixelForValue(m.index);
+          if (px < area.left || px > area.right) return;
+          ctx.beginPath();
+          ctx.moveTo(px, area.top + 12);
+          ctx.lineTo(px, area.bottom);
+          ctx.stroke();
+          ctx.fillText(m.label, px, area.top);
+        });
+        ctx.restore();
+      }
+    };
+
+    const sunBandsPlugin = {
+      id: 'sunBands',
+      beforeDatasetsDraw(c, args, opts) {
+        if (!opts || !opts.samples || !getLocation()) return;
+        const { ctx, chartArea: area, scales: { x } } = c;
+        const stepPx = 2;
+        ctx.save();
+        ctx.fillStyle = opts.color;
+        for (let px = area.left; px < area.right; px += stepPx) {
+          const s = opts.samples[Math.round(x.getValueForPixel(px))];
+          if (!s) continue;
+          const alt = sunAltitudeAt(s.date, s.minutes);
+          const shade = clamp(-alt / 12, 0, 1);
+          if (shade <= 0) continue;
+          ctx.globalAlpha = shade * opts.alpha;
+          ctx.fillRect(px, area.top, stepPx, area.bottom - area.top);
+        }
+        ctx.restore();
+      }
+    };
+
     function renderChart(options = {}) {
       const canvas = document.getElementById('chart');
       const ctx = canvas.getContext('2d');
       const palette = chartPalette();
 
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
-      const stepMinutes = Math.max(1, state.stepMinutes);
       const horizonMinutes = state.horizonHours * 60;
       
       // IMPORTANT: Chart uses higher resolution for visualization
@@ -1606,11 +2850,8 @@ const translations = {
       const kelvinData = [];
       const dimData = [];
       const transitionData = [];
-      const timeData = []; // Store actual time objects for tooltips
+      const timeData = []; // { date, minutes } per sample, for tooltips and sun bands
       
-      // For normalized display (0-100%)
-      const kelvinNormalizedData = [];
-      const dimNormalizedData = [];
 
       // Calculate label frequency based on horizon
       // For 24h: show every 2 hours, for 48h: every 4 hours, for 72h: every 6 hours
@@ -1618,26 +2859,38 @@ const translations = {
 
       for (let i = 0; i <= steps; i++) {
         const minutes = i * chartStepMinutes;
-        const time = new Date(startOfDay.getTime() + minutes * 60000);
-        timeData.push(time);
-        
+        // Each day of the horizon gets its own resolved keyframes (sun triggers move)
+        const date = addDays(viewDate, Math.floor(minutes / 1440));
+        const timeOfDay = minutes % 1440;
+        timeData.push({ date, minutes: timeOfDay });
+
         // Show label at calculated intervals
         const showLabel = minutes % labelInterval === 0;
-        labels.push(showLabel ? time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '');
+        labels.push(showLabel ? formatTime(timeOfDay) : '');
 
-        const timeOfDay = (time.getHours() * 60 + time.getMinutes()) % 1440;
-        const values = evaluateSchedule(timeOfDay);
-        
+        const values = simulateAt(date, timeOfDay);
+
         kelvinData.push(values.kelvin);
         dimData.push(values.dim);
         transitionData.push(values.transition);
-        
-        // Normalize Kelvin: 2000-6500 → 0-100%
-        const kelvinNormalized = ((values.kelvin - 2000) / (6500 - 2000)) * 100;
-        kelvinNormalizedData.push(kelvinNormalized);
-        
-        // Dim is already 0-100%
-        dimNormalizedData.push(values.dim);
+      }
+
+      // Colour temperature axis in real Kelvin, spanning the schedule's own
+      // range in this view (rounded to 100 K, with a small margin).
+      const kelvinMin = Math.min(...kelvinData), kelvinMax = Math.max(...kelvinData);
+      const kelvinPad = Math.max(100, (kelvinMax - kelvinMin) * 0.05);
+      const kelvinAxis = {
+        min: Math.floor((kelvinMin - kelvinPad) / 100) * 100,
+        max: Math.ceil((kelvinMax + kelvinPad) / 100) * 100
+      };
+
+      // Overlap markers for every day of the horizon (sample index = minutes / step)
+      const overlapMarks = [];
+      for (let day = 0; day * 1440 < horizonMinutes; day++) {
+        overlapsOn(addDays(viewDate, day)).forEach(o => {
+          overlapMarks.push({ index: (day * 1440 + o.mEarly) / chartStepMinutes, label: `#${o.pair.early + 1}` });
+          overlapMarks.push({ index: (day * 1440 + o.mLate) / chartStepMinutes, label: `#${o.pair.late + 1}` });
+        });
       }
 
       if (chart) {
@@ -1652,12 +2905,13 @@ const translations = {
 
       chart = new Chart(ctx, {
         type: 'line',
+        plugins: [sunBandsPlugin, overlapMarksPlugin],
         data: {
           labels,
           datasets: [
             {
               label: t('chart_brightness'),
-              data: dimNormalizedData,
+              data: dimData,
               borderColor: palette.accent,
               backgroundColor: `rgba(${palette.accentRgb}, 0.12)`,
               fill: 'origin',
@@ -1671,7 +2925,7 @@ const translations = {
               // One accent per app: the second series is set apart by the
               // text step and a dash pattern, not by a second colour.
               label: t('chart_kelvin'),
-              data: kelvinNormalizedData,
+              data: kelvinData,
               borderColor: palette.secondary,
               backgroundColor: palette.secondary,
               borderDash: [6, 4],
@@ -1694,6 +2948,8 @@ const translations = {
             intersect: false
           },
           plugins: {
+            sunBands: { samples: timeData, color: palette.nightShade, alpha: palette.nightAlpha },
+            overlapMarks: { marks: overlapMarks, color: palette.danger, font: palette.fontMono },
             legend: {
               position: 'top',
               labels: { color: palette.text, font: { family: palette.font }, boxHeight: 2 }
@@ -1711,24 +2967,19 @@ const translations = {
                 title: function(context) {
                   // Show exact time for the data point
                   const index = context[0].dataIndex;
-                  const time = timeData[index];
-                  return time.toLocaleString('de-DE', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    day: '2-digit',
-                    month: '2-digit'
-                  });
+                  const s = timeData[index];
+                  return `${formatDate(s.date)}  ${formatTime(s.minutes)}`;
                 },
                 label: function(context) {
                   const index = context.dataIndex;
                   const datasetIndex = context.datasetIndex;
-                  
+
                   if (datasetIndex === 0) {
                     // Dim dataset
-                    return `Helligkeit: ${dimData[index].toFixed(1)}%`;
+                    return `${t('pdf_brightness')}: ${dimData[index].toFixed(1)} %`;
                   } else {
                     // Kelvin dataset
-                    return `Kelvin: ${Math.round(kelvinData[index])} K`;
+                    return `${t('pdf_kelvin')}: ${Math.round(kelvinData[index])} K`;
                   }
                 },
                 afterBody: function(context) {
@@ -1771,7 +3022,7 @@ const translations = {
               position: 'left',
               title: {
                 display: true,
-                text: 'Helligkeit %',
+                text: t('chart_brightness'),
                 color: palette.tick
               },
               ticks: { color: palette.tick, font: { family: palette.fontMono } },
@@ -1786,13 +3037,14 @@ const translations = {
               position: 'right',
               title: {
                 display: true,
-                text: 'Kelvin (normalisiert)',
+                text: t('chart_kelvin'),
                 color: palette.tick
               },
-              ticks: { color: palette.tick, font: { family: palette.fontMono } },
+              // Kelvin without thousands separator ("4500", not "4.500")
+              ticks: { color: palette.tick, font: { family: palette.fontMono }, callback: v => String(v) },
               border: { color: palette.grid },
-              min: 0,
-              max: 100,
+              min: kelvinAxis.min,
+              max: kelvinAxis.max,
               grid: {
                 drawOnChartArea: false
               }
@@ -1800,27 +3052,550 @@ const translations = {
           }
         }
       });
-
-      // Update stats
-      updateStats(kelvinData, dimData, transitionData);
     }
 
-    function updateStats(kelvinData, dimData, transitionData) {
-      const avgKelvin = Math.round(kelvinData.reduce((a, b) => a + b, 0) / kelvinData.length);
-      const avgDim = Math.round(dimData.reduce((a, b) => a + b, 0) / dimData.length);
-      const avgTransition = Math.round(transitionData.reduce((a, b) => a + b, 0) / transitionData.length);
+    // ============================================================================
+    // SUN INFO (day view header)
+    // ============================================================================
 
-      const stat = (labelKey, value) => `
-        <div class="lkl-stat">
-          <div class="lkl-stat-label">${t(labelKey).replace(/:$/, '')}</div>
-          <div class="lkl-stat-value">${value}</div>
+    function renderSunInfo() {
+      const el = document.getElementById('sunInfo');
+      document.getElementById('viewDate').value = viewDate;
+      const sun = getSunTimes(viewDate);
+      if (!sun) {
+        el.innerHTML = `<span class="lkl-pill is-warn">${t('loc_invalid')}</span>`;
+        return;
+      }
+      const e = sun.events;
+      const fmt = m => (m == null ? '—' : formatTime(m));
+      const pill = (label, value) =>
+        `<span class="lkl-pill">${label} <span class="lkl-mono">${value}</span></span>`;
+
+      let html = `<span class="lkl-pill is-accent">${formatDate(viewDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
+      if (e.sunrise == null && e.sunset == null) {
+        html += pill(sun.maxAltitude > 0 ? t('polar_day') : t('polar_night'), '');
+      }
+      html += pill(t('sun_civil_dawn'), fmt(e.civil_dawn));
+      html += pill(t('sun_sunrise'), fmt(e.sunrise));
+      html += pill(t('sun_solar_noon'), fmt(e.solar_noon));
+      html += pill(t('sun_sunset'), fmt(e.sunset));
+      html += pill(t('sun_civil_dusk'), fmt(e.civil_dusk));
+      html += pill(t('day_length'), sun.dayLength == null ? '—' : formatDuration(sun.dayLength));
+      // Unresolved overlaps on this day — click opens the rule list
+      overlapsOn(viewDate).forEach(o => {
+        html += `<button class="lkl-pill is-danger overlap-pill" onclick="openConflicts()">
+          ${t('overlap_pill')}: #${o.pair.early + 1} <span class="lkl-mono">${formatTime(o.mEarly)}</span>
+          → #${o.pair.late + 1} <span class="lkl-mono">${formatTime(o.mLate)}</span></button>`;
+      });
+      el.innerHTML = html;
+    }
+
+    // ============================================================================
+    // YEAR VIEW
+    // ============================================================================
+    //
+    // A heatmap of the whole year: x = day, y = time of day (10 min rows).
+    // It renders LIGHT, not UI — the simulated output as it would look in a
+    // dark room (blackbody colour × brightness). The constants below are
+    // therefore rendering values, not theme colours, and stay the same in
+    // day and night theme. Axes and labels around the plot use the tokens.
+
+    const YEAR_ROW_MINUTES = 10;
+    const YEAR_ROWS = 1440 / YEAR_ROW_MINUTES;
+    const YEAR_PAD = { left: 40, right: 56, top: 22, bottom: 22 };   // right: keyframe labels
+    const ROOM_RGB = [11, 10, 9];
+    const OVERLAY = 'rgba(255, 255, 255, 0.85)';
+    const OVERLAY_SOFT = 'rgba(255, 255, 255, 0.5)';
+    const OVERLAY_FAINT = 'rgba(255, 255, 255, 0.12)';
+    const OVERLAY_HALO = 'rgba(11, 10, 9, 0.6)';
+    const KF_TRACE = 'rgba(255, 196, 92, 0.95)';
+    const OVERLAP_ON_LIGHT = 'rgb(255, 84, 72)';
+
+    let yearLayout = null;
+
+    function dayOfYear(dateStr) {
+      const { y, m, d } = parseDate(dateStr);
+      return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000);
+    }
+
+    function shiftYear(dateStr, n) {
+      let { y, m, d } = parseDate(dateStr);
+      y += n;
+      if (m === 2 && d === 29 && daysInYear(y) === 365) d = 28;
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+
+    /** Simulate every day of the year once; cached until the state changes. */
+    function computeYearGrid(year) {
+      if (yearGrid && yearGrid.year === year) return yearGrid;
+      const days = daysInYear(year);
+      const dim = new Float32Array(days * YEAR_ROWS);
+      const kelvin = new Float32Array(days * YEAR_ROWS);
+      const daylight = new Float32Array(days * YEAR_ROWS);   // clear-sky lux
+      const loc = getLocation();
+      const sun = [];
+      // Firing time per keyframe and day (NaN = does not fire), for the traces
+      const kfTimes = state.keyframes.map(() => new Float32Array(days).fill(NaN));
+      for (let d = 0; d < days; d++) {
+        const date = addDays(`${year}-01-01`, d);
+        const keyframes = resolveKeyframes(date);
+        keyframes.forEach(kf => { kfTimes[kf.sourceIndex][d] = parseTime(kf.time); });
+        // Local midnight once per day; the rows add minutes to it (the one-hour
+        // shift inside a DST day is irrelevant at this resolution).
+        const midnight = loc ? KfAstro.localMidnightUtc(parseDate(date).y, parseDate(date).m, parseDate(date).d, loc.tz) : 0;
+        for (let r = 0; r < YEAR_ROWS; r++) {
+          const minute = r * YEAR_ROW_MINUTES + YEAR_ROW_MINUTES / 2;
+          const v = evaluateSchedule(minute, keyframes);
+          dim[d * YEAR_ROWS + r] = v.dim;
+          kelvin[d * YEAR_ROWS + r] = v.kelvin;
+          daylight[d * YEAR_ROWS + r] = loc
+            ? KfAstro.clearSkyIlluminance(KfAstro.altitude(midnight + minute * 60000, loc.lat, loc.lon))
+            : 0;
+        }
+        sun.push(getSunTimes(date));
+      }
+      yearGrid = { year, days, dim, kelvin, daylight, sun, kfTimes };
+      return yearGrid;
+    }
+
+    // Colour temperature scale for the "kelvin" mode. Deliberately spread
+    // wider than a real blackbody (where 4000 K and 6500 K look almost alike)
+    // so that differences in the schedule are readable: amber → white → blue.
+    const KELVIN_RAMP = [
+      [2000, [255, 132, 24]],
+      [2700, [255, 176, 92]],
+      [3500, [255, 218, 170]],
+      [4500, [250, 246, 238]],
+      [5500, [214, 228, 255]],
+      [6500, [150, 186, 255]]
+    ];
+
+    function kelvinRamp(k) {
+      if (k <= KELVIN_RAMP[0][0]) return KELVIN_RAMP[0][1];
+      for (let i = 1; i < KELVIN_RAMP.length; i++) {
+        const [k1, c1] = KELVIN_RAMP[i];
+        if (k <= k1) {
+          const [k0, c0] = KELVIN_RAMP[i - 1];
+          const f = (k - k0) / (k1 - k0);
+          return c0.map((v, j) => v + (c1[j] - v) * f);
+        }
+      }
+      return KELVIN_RAMP[KELVIN_RAMP.length - 1][1];
+    }
+
+    const mixRgb = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
+
+    // Artificial light brightness: dark (off) → warm white (100 %). A fixed
+    // scale in both themes, so "bright" always means "much light" — a scale
+    // that follows the theme inverts between day and night theme and reads
+    // as "dark at noon".
+    // The ramp runs over PERCEIVED lightness, not over the dim value: the eye
+    // responds roughly to the cube root of luminance, so 10 % output looks
+    // like ~38 % lightness, not like "nearly off". See perceivedLevel().
+    const DIM_RAMP = [
+      [0,   [16, 17, 24]],
+      [0.5, [128, 124, 116]],
+      [1,   [255, 248, 230]]
+    ];
+
+    /** CIE 1976 lightness L* of a relative luminance 0…1, as 0…1. */
+    function perceivedLevel(y) {
+      const l = y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y;
+      return clamp(l / 100, 0, 1);
+    }
+
+    /**
+     * Colours of the year plot. All modes are rendered as light — bright means
+     * much light — so they share light overlays with a dark halo.
+     *   dim      — artificial light brightness (DIM_RAMP)
+     *   kelvin   — artificial colour temperature (KELVIN_RAMP)
+     *   daylight — potential clear-sky daylight (SKY_RAMP)
+     * Overlaps (see analyzeConflicts) are red in every mode.
+     */
+    function yearScheme() {
+      return {
+        line: OVERLAY, lineSoft: OVERLAY_SOFT, halo: OVERLAY_HALO,
+        faint: OVERLAY_FAINT, trace: KF_TRACE, selected: OVERLAY,
+        overlap: OVERLAP_ON_LIGHT
+      };
+    }
+
+    // Daylight: log scale 1 lx … 100 klx, rendered as the sky it is — here
+    // bright really does mean day. Night → twilight blue → daylight white.
+    const DAYLIGHT_LOG_MAX = 5;   // 10^5 lx
+    const SKY_RAMP = [
+      [0,    [11, 10, 9]],
+      [0.2,  [22, 34, 78]],      //  ~10 lx   late twilight
+      [0.5,  [72, 112, 182]],    // ~300 lx   around sunset
+      [0.75, [186, 212, 240]],   //  ~5 klx   low sun
+      [1,    [255, 247, 222]]    // 100 klx   high sun
+    ];
+
+    function daylightLevel(lux) {
+      return clamp(Math.log10(Math.max(lux, 1)) / DAYLIGHT_LOG_MAX, 0, 1);
+    }
+
+    function rampColor(ramp, v) {
+      for (let i = 1; i < ramp.length; i++) {
+        if (v <= ramp[i][0]) {
+          const [v0, c0] = ramp[i - 1], [v1, c1] = ramp[i];
+          return mixRgb(c0, c1, (v - v0) / (v1 - v0));
+        }
+      }
+      return ramp[ramp.length - 1][1];
+    }
+
+    function formatLux(lux) {
+      if (lux < 1) return '< 1 lx';
+      if (lux < 1000) return `${Math.round(lux)} lx`;
+      return `${(lux / 1000).toFixed(lux < 10000 ? 1 : 0)} klx`;
+    }
+
+    function yearPixel(dim, kelvin, lux) {
+      const level = clamp(dim, 0, 100) / 100;
+      if (yearMode === 'daylight') return rampColor(SKY_RAMP, daylightLevel(lux));
+      if (yearMode === 'kelvin') return kelvinRamp(kelvin);
+      return rampColor(DIM_RAMP, perceivedLevel(level));
+    }
+
+    /** Colour scale shown in the legend for the active mode. */
+    function renderYearScale() {
+      const css = rgb => `rgb(${rgb.map(Math.round).join(',')})`;
+      // ticks: [label, position 0…1] — placed where the value sits on the bar
+      let stops, ticks, label;
+      if (yearMode === 'daylight') {
+        stops = SKY_RAMP.map(([v, c]) => `${css(c)} ${v * 100}%`);
+        ticks = [['1 lx', 0], ['100 lx', 0.4], ['100 klx', 1]];
+        label = t('scale_daylight');
+      } else if (yearMode === 'kelvin') {
+        stops = KELVIN_RAMP.map(([k, c]) => `${css(c)} ${((k - 2000) / 4500 * 100).toFixed(1)}%`);
+        ticks = [['2000 K', 0], ['4000 K', 2000 / 4500], ['6500 K', 1]];
+        label = t('scale_kelvin');
+      } else {
+        stops = DIM_RAMP.map(([v, c]) => `${css(c)} ${v * 100}%`);
+        ticks = [0, 10, 25, 100].map(p => [`${p} %`, perceivedLevel(p / 100)]);
+        label = t('scale_dim');
+      }
+      document.getElementById('yearScale').innerHTML = `
+        <span>${label}</span>
+        <span>
+          <span class="year-scale-bar" style="display:block; background: linear-gradient(90deg, ${stops.join(', ')})"></span>
+          <span class="year-scale-ticks">${ticks.map(([x, pos]) =>
+            // ends align flush with the bar, inner ticks are centred on their value
+            `<span style="left:${pos * 100}%; transform:translateX(-${pos === 0 ? 0 : pos === 1 ? 100 : 50}%)">${x}</span>`).join('')}</span>
+        </span>`;
+    }
+
+    /** Red notice above the year plot, one line per unresolved overlap. */
+    function renderOverlapNotice(overlapPairs, year) {
+      const el = document.getElementById('overlapNotice');
+      if (!overlapPairs.length) { el.hidden = true; el.innerHTML = ''; return; }
+      const kfLabel = i => `<strong>#${i + 1}</strong> ${describeTrigger(state.keyframes[i])}`;
+      el.innerHTML = `
+        <strong>${t('overlap_title')}:</strong>
+        ${overlapPairs.map(p => `<div>${t('overlap_line')
+          .replace('{y}', kfLabel(p.early))
+          .replace('{x}', kfLabel(p.late))
+          .replace('{n}', p.overlapDays.length)
+          .replace('{ranges}', formatDayRanges(p.overlapDays, year))}</div>`).join('')}
+        <div class="btn-row spaced-sm">
+          <button class="lkl-btn is-small" onclick="openConflicts()">${t('overlap_action')}</button>
         </div>`;
+      el.hidden = false;
+    }
 
-      document.getElementById('stats').innerHTML =
-        stat('stats_keyframes', state.keyframes.length) +
-        stat('stats_kelvin', `${avgKelvin} K`) +
-        stat('stats_brightness', `${avgDim} %`) +
-        stat('stats_transition', `${avgTransition} s`);
+    function renderYearView() {
+      const canvas = document.getElementById('yearCanvas');
+      const year = parseDate(viewDate).y;
+      document.getElementById('yearValue').textContent = year;
+      document.querySelectorAll('[data-year-mode]').forEach(btn =>
+        btn.classList.toggle('is-active', btn.dataset.yearMode === yearMode));
+      document.querySelectorAll('[data-year-overlay]').forEach(btn =>
+        btn.classList.toggle('is-active', yearOverlays[btn.dataset.yearOverlay]));
+
+
+      const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
+      if (!cssW || !cssH) return;
+      const grid = computeYearGrid(year);
+      const palette = chartPalette();
+      const scheme = yearScheme();
+      const overlapPairs = analyzeConflicts();
+      renderOverlapNotice(overlapPairs, year);
+      renderYearScale();
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cssW, cssH);
+
+      const plot = {
+        x: YEAR_PAD.left,
+        y: YEAR_PAD.top,
+        w: cssW - YEAR_PAD.left - YEAR_PAD.right,
+        h: cssH - YEAR_PAD.top - YEAR_PAD.bottom
+      };
+      yearLayout = { plot, grid };
+      const xOf = d => plot.x + (d + 0.5) * plot.w / grid.days;
+      const yOf = m => plot.y + (m / 1440) * plot.h;
+
+      // Heatmap: one pixel per day × row, scaled up without smoothing
+      const img = new ImageData(grid.days, YEAR_ROWS);
+      for (let d = 0; d < grid.days; d++) {
+        for (let r = 0; r < YEAR_ROWS; r++) {
+          const i = d * YEAR_ROWS + r;
+          const [red, green, blue] = yearPixel(grid.dim[i], grid.kelvin[i], grid.daylight[i]);
+          const p = (r * grid.days + d) * 4;
+          img.data[p] = red; img.data[p + 1] = green; img.data[p + 2] = blue; img.data[p + 3] = 255;
+        }
+      }
+      const off = document.createElement('canvas');
+      off.width = grid.days;
+      off.height = YEAR_ROWS;
+      off.getContext('2d').putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, plot.x, plot.y, plot.w, plot.h);
+      // Frame, so a 0 % area still has an edge against the card
+      ctx.strokeStyle = palette.grid;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(plot.x - 0.5, plot.y - 0.5, plot.w + 1, plot.h + 1);
+
+      // Month separators and hour grid inside the plot
+      ctx.strokeStyle = scheme.faint;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let month = 1; month < 12; month++) {
+        const x = Math.round(plot.x + dayOfYear(`${year}-${pad2(month + 1)}-01`) / grid.days * plot.w) + 0.5;
+        ctx.moveTo(x, plot.y); ctx.lineTo(x, plot.y + plot.h);
+      }
+      for (let h = 6; h < 24; h += 6) {
+        const y = Math.round(yOf(h * 60)) + 0.5;
+        ctx.moveTo(plot.x, y); ctx.lineTo(plot.x + plot.w, y);
+      }
+      ctx.stroke();
+
+      // Lines get a dark halo first so they stay visible on bright areas.
+      const strokeWithHalo = (style, dash, width) => {
+        ctx.setLineDash(dash);
+        ctx.strokeStyle = scheme.halo;
+        ctx.lineWidth = width + 2;
+        ctx.stroke();
+        ctx.strokeStyle = style;
+        ctx.lineWidth = width;
+        ctx.stroke();
+      };
+
+      // Sun event curves (gaps where an event does not occur)
+      if (yearOverlays.sun) {
+        const sunLine = (eventName, style, dash) => {
+          ctx.beginPath();
+          let pen = false;
+          for (let d = 0; d < grid.days; d++) {
+            const m = grid.sun[d] ? grid.sun[d].events[eventName] : null;
+            if (m == null) { pen = false; continue; }
+            if (pen) ctx.lineTo(xOf(d), yOf(m)); else { ctx.moveTo(xOf(d), yOf(m)); pen = true; }
+          }
+          strokeWithHalo(style, dash, 1.25);
+        };
+        sunLine('civil_dawn', scheme.lineSoft, [4, 3]);
+        sunLine('civil_dusk', scheme.lineSoft, [4, 3]);
+        sunLine('sunrise', scheme.line, []);
+        sunLine('sunset', scheme.line, []);
+      }
+
+      // Keyframes. A trace is only drawn where it tells something: for sun
+      // keyframes (the time moves) and for keyframes that are skipped on some
+      // days (gaps). A fixed keyframe that fires every day would just be a
+      // horizontal line — it only gets its label in the right gutter.
+      if (yearOverlays.keyframes) {
+        const labels = [];
+        grid.kfTimes.forEach((times, index) => {
+          let last = null, missing = 0;
+          for (let d = 0; d < grid.days; d++) {
+            if (Number.isNaN(times[d])) missing++; else last = { d, m: times[d] };
+          }
+          if (!last) return;   // never fires this year
+
+          if (state.keyframes[index].trigger === 'sun' || missing > 0) {
+            ctx.beginPath();
+            let pen = false;
+            for (let d = 0; d < grid.days; d++) {
+              const m = times[d];
+              if (Number.isNaN(m)) { pen = false; continue; }
+              if (pen) ctx.lineTo(xOf(d), yOf(m)); else { ctx.moveTo(xOf(d), yOf(m)); pen = true; }
+            }
+            strokeWithHalo(scheme.trace, [2, 3], 1.5);
+          }
+          const group = state.keyframes[index].group;
+          labels.push({ text: `#${index + 1}${group ? '·' + group : ''}`, anchor: yOf(last.m) });
+        });
+        ctx.setLineDash([]);
+
+        // Overlaps: both keyframes of an unresolved pair turn red on the days
+        // where they fire against the table order.
+        overlapPairs.forEach(p => {
+          const days = new Set(p.overlapDays);
+          [p.early, p.late].forEach(index => {
+            const times = grid.kfTimes[index];
+            ctx.beginPath();
+            let pen = false;
+            for (let d = 0; d < grid.days; d++) {
+              const m = times[d];
+              if (!days.has(d) || Number.isNaN(m)) { pen = false; continue; }
+              if (pen) ctx.lineTo(xOf(d), yOf(m)); else { ctx.moveTo(xOf(d), yOf(m)); pen = true; }
+            }
+            strokeWithHalo(scheme.overlap, [], 2.5);
+          });
+        });
+
+        // Gutter labels, pushed apart so they never overlap
+        const gap = 12;
+        labels.sort((a, b) => a.anchor - b.anchor);
+        labels.forEach((l, i) => {
+          l.y = Math.max(l.anchor, i ? labels[i - 1].y + gap : plot.y + 5);
+        });
+        for (let i = labels.length - 1; i >= 0; i--) {
+          const max = i === labels.length - 1 ? plot.y + plot.h - 5 : labels[i + 1].y - gap;
+          labels[i].y = Math.min(labels[i].y, max);
+        }
+        const edge = plot.x + plot.w;
+        ctx.font = `600 10px ${palette.fontMono}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 1;
+        labels.forEach(l => {
+          ctx.strokeStyle = palette.tick;
+          ctx.beginPath();
+          ctx.moveTo(edge, l.anchor);
+          ctx.lineTo(edge + 5, l.anchor);
+          ctx.lineTo(edge + 9, l.y);
+          ctx.stroke();
+          ctx.fillStyle = palette.text;
+          ctx.fillText(l.text, edge + 11, l.y);
+        });
+      }
+
+      // Axes (outside the plot → theme tokens)
+      ctx.fillStyle = palette.tick;
+      ctx.font = `11px ${palette.fontMono}`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let h = 0; h <= 24; h += 3) ctx.fillText(`${pad2(h)}:00`, plot.x - 6, yOf(h * 60));
+
+      ctx.font = `11px ${palette.font}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      const monthFmt = new Intl.DateTimeFormat(uiLocale(), { month: 'short', timeZone: 'UTC' });
+      for (let month = 0; month < 12; month++) {
+        const x = plot.x + dayOfYear(`${year}-${pad2(month + 1)}-01`) / grid.days * plot.w;
+        ctx.fillText(monthFmt.format(new Date(Date.UTC(year, month, 1))), x + 3, plot.y + plot.h + 6);
+      }
+
+      // Overlap strip above the plot: every day with an unresolved overlap.
+      // Outside the plot, so it uses the theme's danger colour.
+      ctx.fillStyle = palette.danger;
+      const overlapDaySet = new Set(overlapPairs.flatMap(p => p.overlapDays));
+      overlapDaySet.forEach(d => {
+        const x0 = plot.x + d / grid.days * plot.w;
+        ctx.fillRect(x0, plot.y - 8, plot.w / grid.days + 0.5, 5);
+      });
+
+      // Today (small tick below the plot) and selected day (line + accent marker)
+      const today = todayStr();
+      if (parseDate(today).y === year) {
+        const x = xOf(dayOfYear(today));
+        ctx.fillStyle = palette.tick;
+        ctx.fillRect(x - 0.75, plot.y + plot.h + 1, 1.5, 5);
+      }
+      const sel = dayOfYear(viewDate);
+      const sx = xOf(sel);
+      ctx.strokeStyle = scheme.selected;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx, plot.y); ctx.lineTo(sx, plot.y + plot.h);
+      ctx.stroke();
+      ctx.fillStyle = palette.accent;
+      ctx.beginPath();
+      ctx.moveTo(sx - 6, plot.y - 12); ctx.lineTo(sx + 6, plot.y - 12); ctx.lineTo(sx, plot.y - 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function yearHit(ev) {
+      if (!yearLayout) return null;
+      const canvas = document.getElementById('yearCanvas');
+      const rect = canvas.getBoundingClientRect();
+      const x = ev.clientX - rect.left, y = ev.clientY - rect.top;
+      const { plot, grid } = yearLayout;
+      if (x < plot.x || x >= plot.x + plot.w || y < plot.y || y >= plot.y + plot.h) return null;
+      return {
+        x, y,
+        day: Math.floor((x - plot.x) / plot.w * grid.days),
+        row: Math.floor((y - plot.y) / plot.h * YEAR_ROWS),
+        grid
+      };
+    }
+
+    function showYearTooltip(ev) {
+      const tip = document.getElementById('yearTooltip');
+      const hit = yearHit(ev);
+      if (!hit) { tip.hidden = true; return; }
+      const { grid, day, row } = hit;
+      const i = day * YEAR_ROWS + row;
+      const date = addDays(`${grid.year}-01-01`, day);
+      const sun = grid.sun[day];
+      const fmt = m => (m == null ? '—' : formatTime(m));
+      // Last keyframe that fired at or before this row (wrapping to the day's last one)
+      const fired = resolveKeyframes(date)
+        .map(k => ({ n: k.sourceIndex + 1, m: parseTime(k.time) }))
+        .sort((a, b) => a.m - b.m);
+      const minute = row * YEAR_ROW_MINUTES + YEAR_ROW_MINUTES / 2;
+      const lastKf = [...fired].reverse().find(k => k.m <= minute) || fired[fired.length - 1];
+      tip.innerHTML = `
+        <strong>${formatDate(date)}</strong>
+        <span class="lkl-mono">${formatTime(row * YEAR_ROW_MINUTES)}–${formatTime((row + 1) * YEAR_ROW_MINUTES)}</span><br>
+        ${t('pdf_brightness')}: <span class="lkl-mono">${Math.round(grid.dim[i])} %</span> ·
+        ${t('pdf_kelvin')}: <span class="lkl-mono">${Math.round(grid.kelvin[i])} K</span><br>
+        ${getLocation() ? `${t('tip_daylight')}: <span class="lkl-mono">${formatLux(grid.daylight[i])}</span><br>` : ''}
+        ${t('sun_sunrise')} <span class="lkl-mono">${fmt(sun && sun.events.sunrise)}</span> ·
+        ${t('sun_sunset')} <span class="lkl-mono">${fmt(sun && sun.events.sunset)}</span>
+        ${lastKf ? `<br>${t('last_keyframe')}: <span class="lkl-mono">#${lastKf.n} (${formatTime(lastKf.m)})</span>` : ''}`;
+      tip.hidden = false;
+      const wrap = document.getElementById('yearWrap');
+      const left = hit.x + 14 + tip.offsetWidth > wrap.clientWidth ? hit.x - 14 - tip.offsetWidth : hit.x + 14;
+      tip.style.left = `${Math.max(0, left)}px`;
+      tip.style.top = `${Math.max(0, hit.y - tip.offsetHeight - 10)}px`;
+    }
+
+    function setupYearView() {
+      const canvas = document.getElementById('yearCanvas');
+      canvas.addEventListener('mousemove', showYearTooltip);
+      canvas.addEventListener('mouseleave', () => { document.getElementById('yearTooltip').hidden = true; });
+      canvas.addEventListener('click', ev => {
+        const hit = yearHit(ev);
+        if (hit) setViewDate(addDays(`${hit.grid.year}-01-01`, hit.day));
+      });
+      document.querySelectorAll('[data-year-mode]').forEach(btn => {
+        btn.addEventListener('click', () => { yearMode = btn.dataset.yearMode; renderYearView(); });
+      });
+      document.querySelectorAll('[data-year-overlay]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.yearOverlay;
+          yearOverlays[key] = !yearOverlays[key];
+          renderYearView();
+        });
+      });
+      document.getElementById('yearPrevBtn').addEventListener('click', () => setViewDate(shiftYear(viewDate, -1)));
+      document.getElementById('yearNextBtn').addEventListener('click', () => setViewDate(shiftYear(viewDate, 1)));
+      if (window.ResizeObserver) {
+        let lastWidth = 0;
+        new ResizeObserver(entries => {
+          const w = entries[0].contentRect.width;
+          if (w !== lastWidth) { lastWidth = w; renderYearView(); }
+        }).observe(document.getElementById('yearWrap'));
+      }
     }
 
     // ============================================================================
@@ -1828,16 +3603,18 @@ const translations = {
     // ============================================================================
 
     function generateHaJson() {
+      const loc = getLocation();
+      const today = todayStr();
       return {
         version: 1,
         name: state.scheduleName || 'My Schedule',  // Metadata: WebApp verwendet es für Dateinamen/Titel
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Berlin",
+        timezone: loc ? loc.tz : (Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Berlin"),
+        location: loc ? { latitude: loc.lat, longitude: loc.lon } : null,
         stepMinutes: state.stepMinutes,
         horizonHours: state.horizonHours,
-        wrapAround: state.wrapAround,
-        startDateTime: null,
         keyframes: state.keyframes.map(kf => {
-          return {
+          const out = {
+            id: kf.id,
             time: kf.time,
             kelvin: kf.kelvin,
             dim: kf.dim,
@@ -1846,8 +3623,54 @@ const translations = {
             transitionSeconds: kf.transitionSeconds,
             transitionDirection: kf.transitionDirection || 'after'
           };
-        })
+          if (kf.trigger === 'sun') {
+            // The HA integration does not evaluate sun triggers yet and reads
+            // `time` only — so `time` carries today's resolved value as fallback.
+            const m = resolveKeyframeMinutes(kf, today);
+            if (m != null) out.time = formatTime(m);
+            Object.assign(out, {
+              trigger: 'sun',
+              sunEvent: kf.sunEvent,
+              offsetMinutes: kf.offsetMinutes || 0,
+              notBefore: kf.notBefore || null,
+              notAfter: kf.notAfter || null
+            });
+          }
+          if (kf.group) out.group = kf.group;
+          return out;
+        }),
+        // Keyframe groups with their priority rule, see listGroups()
+        groups: listGroups().map(g => ({ id: g.id, rule: g.rule }))
       };
+    }
+
+    /** Apply an imported schedule JSON (file or text box). */
+    function applyImportedJson(json) {
+      if (json.version !== 1 || !Array.isArray(json.keyframes)) return false;
+      if (json.name) state.scheduleName = json.name;
+      state.stepMinutes = json.stepMinutes || 5;
+      state.horizonHours = json.horizonHours || 48;
+      if (json.location && Number.isFinite(json.location.latitude) && Number.isFinite(json.location.longitude)) {
+        state.location = {
+          lat: json.location.latitude,
+          lon: json.location.longitude,
+          tz: json.timezone || DEFAULT_LOCATION.tz
+        };
+      }
+      state.keyframes = json.keyframes.map(kf => normalizeKeyframe({
+        ...kf,
+        notBefore: kf.notBefore || '',
+        notAfter: kf.notAfter || ''
+      }));
+      ensureUniqueIds();
+      state.groupRules = {};
+      (Array.isArray(json.groups) ? json.groups : []).forEach(g => {
+        if (g && GROUP_IDS.includes(g.id) && GROUP_RULES.includes(g.rule)) state.groupRules[g.id] = g.rule;
+      });
+      pruneGroups();
+      saveState();
+      updateUI();
+      return true;
     }
 
     function updateJsonOutput() {
@@ -1873,27 +3696,24 @@ const translations = {
 
     function downloadCsv() {
       // Generate CSV with schedule values
-      const stepMinutes = Math.max(1, state.stepMinutes);
+      // Same horizon as the day view, starting at the viewed day
       const horizonMinutes = state.horizonHours * 60;
       const chartStepMinutes = 0.5; // 30 second resolution
       const steps = Math.ceil(horizonMinutes / chartStepMinutes);
-      
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
+
       // CSV Header
-      let csv = 'Zeit,Kelvin,Helligkeit %,Transition (s)\n';
-      
+      let csv = 'Datum,Zeit,Kelvin,Helligkeit %,Transition (s)\n';
+
       // Generate data points
       for (let i = 0; i <= steps; i++) {
         const minutes = i * chartStepMinutes;
-        const time = new Date(startOfDay.getTime() + minutes * 60000);
-        const timeStr = time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        
-        const timeOfDay = (time.getHours() * 60 + time.getMinutes() + time.getSeconds() / 60) % 1440;
-        const values = evaluateSchedule(timeOfDay);
-        
-        csv += `${timeStr},${Math.round(values.kelvin)},${Math.round(values.dim)},${values.transition}\n`;
+        const date = addDays(viewDate, Math.floor(minutes / 1440));
+        const timeOfDay = minutes % 1440;
+        const timeStr = `${formatTime(Math.floor(timeOfDay))}:${timeOfDay % 1 ? '30' : '00'}`;
+
+        const values = simulateAt(date, timeOfDay);
+
+        csv += `${date},${timeStr},${Math.round(values.kelvin)},${Math.round(values.dim)},${values.transition}\n`;
       }
       
       // Download
@@ -1922,6 +3742,11 @@ const translations = {
       return img;
     }
 
+    // jsPDF standard fonts only cover WinAnsi — map the few symbols we use.
+    function pdfText(s) {
+      return s.replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/[−–]/g, '-').replace(/→/g, '->');
+    }
+
     function downloadPdf() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -1942,7 +3767,10 @@ const translations = {
       doc.setFont(undefined, 'normal');
       const locale = currentLang === 'de' ? 'de-DE' : currentLang === 'es' ? 'es-ES' : 'en-US';
       doc.text(`${t('pdf_created')} ${new Date().toLocaleDateString(locale)}`, margin, yPos);
-      yPos += 15;
+      yPos += 6;
+      const pdfLoc = getLocation();
+      if (pdfLoc) doc.text(`${t('location')}: ${pdfLoc.lat.toFixed(4)}, ${pdfLoc.lon.toFixed(4)} (${pdfLoc.tz})`, margin, yPos);
+      yPos += 9;
       
       // Keyframes Table
       doc.setFontSize(14);
@@ -1964,7 +3792,7 @@ const translations = {
                              '-';
         
         return [
-          kf.time,
+          pdfText(describeTrigger(kf)),
           `${kf.kelvin}K`,
           `${kf.dim}%`,
           kf.mode === 'instant' ? t('mode_instant') : kf.mode === 'transition' ? t('mode_transition') : t('mode_interpolate'),
@@ -1993,7 +3821,7 @@ const translations = {
       
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
-      doc.text(t('pdf_preview'), margin, yPos);
+      doc.text(`${t('pdf_preview')} - ${pdfText(formatDate(viewDate))}`, margin, yPos);
       yPos += 5;
       
       // Get chart as image
@@ -2096,25 +3924,7 @@ const translations = {
         try {
           const json = JSON.parse(e.target.result);
           
-          if (json.version === 1 && json.keyframes) {
-            state.scheduleName = json.name || 'My Schedule';  // Load name from JSON
-            state.stepMinutes = json.stepMinutes || 5;
-            state.horizonHours = json.horizonHours || 48;
-            state.wrapAround = json.wrapAround !== false;
-            state.keyframes = json.keyframes.map(kf => {
-              return {
-                time: kf.time,
-                kelvin: kf.kelvin,
-                dim: kf.dim,
-                mode: kf.mode || 'instant',
-                curve: kf.curve || 'linear',
-                transitionSeconds: kf.transitionSeconds || 300,
-                transitionDirection: kf.transitionDirection || 'after'
-              };
-            });
-            
-            saveState();
-            updateUI();
+          if (applyImportedJson(json)) {
             alert('✅ Zeitplan erfolgreich importiert!');
           } else {
             alert('❌ Ungültiges JSON-Format');
@@ -2134,24 +3944,7 @@ const translations = {
       try {
         const json = JSON.parse(document.getElementById('jsonOutput').value);
         
-        if (json.version === 1 && json.keyframes) {
-          state.stepMinutes = json.stepMinutes || 5;
-          state.horizonHours = json.horizonHours || 48;
-          state.wrapAround = json.wrapAround !== false;
-          state.keyframes = json.keyframes.map(kf => {
-            return {
-              time: kf.time,
-              kelvin: kf.kelvin,
-              dim: kf.dim,
-              mode: kf.mode || 'instant',
-              curve: kf.curve || 'linear',
-              transitionSeconds: kf.transitionSeconds || 300,
-              transitionDirection: kf.transitionDirection || 'after'
-            };
-          });
-          
-          saveState();
-          updateUI();
+        if (applyImportedJson(json)) {
           alert('✅ JSON erfolgreich übernommen!');
         } else {
           alert('❌ Ungültiges JSON-Format');
@@ -2169,33 +3962,42 @@ const translations = {
     document.getElementById('stepMinutes').addEventListener('change', (e) => {
       state.stepMinutes = Math.max(1, Math.min(60, parseInt(e.target.value) || 5));
       saveState();
-      renderChart();
+      renderViews();
       updateJsonOutput();
     });
 
     document.getElementById('horizonHours').addEventListener('change', (e) => {
       state.horizonHours = parseInt(e.target.value);
       saveState();
-      renderChart();
-      updateJsonOutput();
-    });
-
-    document.getElementById('wrapAround').addEventListener('change', (e) => {
-      state.wrapAround = e.target.value === 'true';
-      saveState();
-      renderChart();
+      renderViews();
       updateJsonOutput();
     });
 
     document.getElementById('addKeyframeBtn').addEventListener('click', addKeyframe);
     document.getElementById('sortByTimeBtn').addEventListener('click', sortKeyframesByTime);
-    document.getElementById('loadPresetBtn').addEventListener('click', () => loadPreset('example'));
+    document.getElementById('presetSelect').addEventListener('change', e => {
+      loadPreset(e.target.value);
+      e.target.value = '';   // back to the placeholder, so the same example can be loaded again
+    });
     document.getElementById('loadFileBtn').addEventListener('click', loadFileTop);
     document.getElementById('fileInputTop').addEventListener('change', handleFileImport);
     document.getElementById('downloadJsonBtn').addEventListener('click', downloadJson);
     document.getElementById('downloadPdfBtn').addEventListener('click', downloadPdf);
     document.getElementById('downloadCsvBtn').addEventListener('click', downloadCsv);
     document.getElementById('importFromTextBtn').addEventListener('click', importFromText);
+
+    ['locLat', 'locLon', 'locTz'].forEach(id =>
+      document.getElementById(id).addEventListener('change', readLocationFields));
+    document.getElementById('locFromHaBtn').addEventListener('click', () => {
+      const loc = locationFromHa();
+      if (loc) setLocation(loc); else updateLocationHelp(t('loc_ha_unavailable'));
+    });
+    document.getElementById('locFromBrowserBtn').addEventListener('click', locationFromBrowser);
+
+    document.getElementById('viewDate').addEventListener('change', e => setViewDate(e.target.value));
+    document.getElementById('dayPrevBtn').addEventListener('click', () => setViewDate(addDays(viewDate, -1)));
+    document.getElementById('dayNextBtn').addEventListener('click', () => setViewDate(addDays(viewDate, 1)));
+    document.getElementById('todayBtn').addEventListener('click', () => setViewDate(todayStr()));
 
     // ============================================================================
     // INITIALIZATION
@@ -2215,10 +4017,12 @@ const translations = {
           btn.classList.toggle('is-active', current === btn.dataset.themeV);
         });
         // Canvas does not inherit CSS — redraw with the new tokens
-        if (chart) renderChart();
+        if (chart) renderViews();
       });
     }
 
+    fillTimeZoneList();
+    setupYearView();
     loadState();
     setLanguage(currentLang);  // Initialize i18n
     setupThemeControls();

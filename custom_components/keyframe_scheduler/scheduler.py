@@ -69,12 +69,14 @@ class Keyframe:
 
 @dataclass(frozen=True)
 class ScheduleSpec:
-    """Complete schedule specification."""
+    """Complete schedule specification.
+
+    A schedule is always a daily profile: keyframes repeat every day and the
+    curve continues across midnight.
+    """
     timezone: str = "Europe/Berlin"
     step_minutes: int = 5
     horizon_hours: int = 48
-    wrap_around: bool = True
-    start_datetime: Optional[str] = None
     keyframes: Tuple[Keyframe, ...] = ()
 
 
@@ -94,8 +96,8 @@ def spec_from_dict(data: Dict[str, Any]) -> ScheduleSpec:
     timezone = data.get("timezone", "Europe/Berlin")
     step_minutes = max(1, min(60, int(data.get("stepMinutes", 5))))
     horizon_hours = max(1, min(168, int(data.get("horizonHours", 48))))
-    wrap_around = bool(data.get("wrapAround", True))
-    start_datetime = data.get("startDateTime")
+    # "wrapAround" and "startDateTime" in older files are ignored: the
+    # one-shot mode they configured has been removed, every schedule is daily.
 
     keyframes = []
     for kf_data in data.get("keyframes", []):
@@ -120,8 +122,6 @@ def spec_from_dict(data: Dict[str, Any]) -> ScheduleSpec:
         timezone=timezone,
         step_minutes=step_minutes,
         horizon_hours=horizon_hours,
-        wrap_around=wrap_around,
-        start_datetime=start_datetime,
         keyframes=tuple(keyframes),
     )
 
@@ -139,30 +139,21 @@ class Evaluator:
         self.default_kelvin = default_kelvin
         self.default_dim = default_dim
 
-        # Parse start datetime
-        if spec.start_datetime:
-            dt = datetime.fromisoformat(spec.start_datetime)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=ZoneInfo(spec.timezone))
-            self.start_dt = dt
-        else:
-            now = datetime.now(ZoneInfo(spec.timezone))
-            self.start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
     def evaluate_at(self, when: datetime) -> ScheduleValues:
         """Evaluate schedule at given datetime."""
-        # Ensure timezone
+        tz = ZoneInfo(self.spec.timezone)
+        # Ensure timezone, then read the local wall clock of the schedule's zone
         if when.tzinfo is None:
-            when = when.replace(tzinfo=ZoneInfo(self.spec.timezone))
+            when = when.replace(tzinfo=tz)
+        local = when.astimezone(tz)
 
-        # Calculate minutes since start
-        minutes_since_start = (when - self.start_dt).total_seconds() / 60.0
-
-        if self.spec.wrap_around:
-            # Wrap to 24h cycle
-            time_of_day = minutes_since_start % 1440.0
-        else:
-            time_of_day = minutes_since_start
+        # Minutes since local midnight. Taken from the wall clock rather than
+        # counted from a fixed start, so DST switches need no restart.
+        time_of_day = (
+            local.hour * 60
+            + local.minute
+            + (local.second + local.microsecond / 1_000_000) / 60.0
+        )
 
         return self._evaluate_at_minutes(time_of_day)
 
@@ -195,21 +186,20 @@ class Evaluator:
             if kf_time > time_minutes and next_kf is None:
                 next_kf = (kf, kf_time)
 
-        # Handle wrap-around
-        if self.spec.wrap_around:
-            if prev_kf is None and sorted_kf:
-                # Before first keyframe - use last from previous day
-                last_kf = sorted_kf[-1]
-                prev_kf = (last_kf, parse_time(last_kf.time) - 1440)
-                # before_prev would be second-to-last
-                if len(sorted_kf) > 1:
-                    before_last_kf = sorted_kf[-2]
-                    before_prev_kf = (before_last_kf, parse_time(before_last_kf.time) - 1440)
+        # Wrap around midnight (every schedule is a daily profile)
+        if prev_kf is None and sorted_kf:
+            # Before first keyframe - use last from previous day
+            last_kf = sorted_kf[-1]
+            prev_kf = (last_kf, parse_time(last_kf.time) - 1440)
+            # before_prev would be second-to-last
+            if len(sorted_kf) > 1:
+                before_last_kf = sorted_kf[-2]
+                before_prev_kf = (before_last_kf, parse_time(before_last_kf.time) - 1440)
 
-            if next_kf is None and sorted_kf:
-                # After last keyframe - use first from next day
-                first_kf = sorted_kf[0]
-                next_kf = (first_kf, parse_time(first_kf.time) + 1440)
+        if next_kf is None and sorted_kf:
+            # After last keyframe - use first from next day
+            first_kf = sorted_kf[0]
+            next_kf = (first_kf, parse_time(first_kf.time) + 1440)
 
         # No previous keyframe - use default or next
         if prev_kf is None:

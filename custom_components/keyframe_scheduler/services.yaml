@@ -13,7 +13,7 @@ set_schedule:
       name: Schedule JSON
       description: The schedule as a JSON string or dict
       required: true
-      example: '{"version": 1, "timezone": "Europe/Berlin", "stepMinutes": 5, "wrapAround": true, "keyframes": [...]}'
+      example: '{"version": 1, "timezone": "Europe/Berlin", "stepMinutes": 5, "keyframes": [...]}'
       selector:
         object:
 

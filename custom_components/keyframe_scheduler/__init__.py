@@ -140,12 +140,11 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
                 next_kf = kf
                 break
         
-        # Wrap around
-        if self.spec.wrap_around:
-            if not prev_kf and sorted_kf:
-                prev_kf = sorted_kf[-1]
-            if not next_kf and sorted_kf:
-                next_kf = sorted_kf[0]
+        # Wrap around midnight (every schedule is a daily profile)
+        if not prev_kf and sorted_kf:
+            prev_kf = sorted_kf[-1]
+        if not next_kf and sorted_kf:
+            next_kf = sorted_kf[0]
         
         return prev_kf, next_kf
     
@@ -419,8 +418,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "timezone": hass.config.time_zone or "Europe/Berlin",
             "stepMinutes": DEFAULT_STEP_MINUTES,
             "horizonHours": 48,
-            "wrapAround": True,
-            "startDateTime": None,
             "keyframes": [],
         }
         await store.async_set(entry.entry_id, schedule_dict)
