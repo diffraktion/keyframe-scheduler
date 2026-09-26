@@ -262,6 +262,26 @@
     .spaced-sm { margin-top: var(--lkl-space-2); }
     .legend-line.is-danger { border-top-color: var(--lkl-danger); border-top-width: 3px; }
     #yearCanvas { display: block; width: 100%; height: 340px; cursor: crosshair; }
+    /* Help card for the not-before / not-after bounds (floats above the table) */
+    .bounds-tip {
+      position: fixed;
+      z-index: 20;
+      max-width: 420px;
+      padding: var(--lkl-space-3) var(--lkl-space-4);
+      font-size: var(--lkl-fs-sm);
+      line-height: var(--lkl-lh-base);
+      background: var(--lkl-solid-1);
+      color: var(--lkl-text-2);
+      border: 1px solid var(--lkl-border);
+      border-radius: var(--lkl-radius-sm);
+      box-shadow: var(--lkl-shadow-card);
+    }
+    .bounds-tip strong { color: var(--lkl-text); }
+    .bounds-tip .lkl-mono { color: var(--lkl-text); }
+    .bounds-tip p { margin: 0 0 var(--lkl-space-2); }
+    .bounds-tip ul { margin: 0 0 var(--lkl-space-2); padding-left: var(--lkl-space-5); }
+    .bounds-row .trigger-label { cursor: help; }
+
     .year-tooltip {
       position: absolute;
       pointer-events: none;
@@ -316,6 +336,9 @@
 </head>
 <body>
   <div class="app">
+    <!-- Floating help for the not-before / not-after bounds (outside the glass
+         cards: their backdrop-filter would anchor position:fixed to the card) -->
+    <div class="bounds-tip" id="boundsTip" hidden></div>
     <header class="app-header">
       <div>
         <h1 class="lkl-h1">Keyframe Scheduler</h1>
@@ -1184,6 +1207,19 @@ const translations = {
     conflict_action_earliest: "Gruppe: früherer gilt",
     conflict_action_latest: "Gruppe: späterer gilt",
     conflict_action_all: "Beide zulassen",
+    bounds_help_intro: "Frühestens/spätestens begrenzen die Sonnenzeit dieses Keyframes (Ereignis + Versatz) auf ein Zeitfenster. Leer = keine Grenze. Tritt das Ereignis nicht ein, gilt die Grenze als Ersatzzeit.",
+    bounds_help_never: "Das Ereignis tritt im Jahr {year} an diesem Standort nie ein – der Keyframe löst nur über eine Grenze aus.",
+    bounds_help_range: "Im Jahr {year} ohne Grenzen: {min} – {max}, Median {median}.",
+    bounds_help_missing: "An {n} Tagen tritt das Ereignis nicht ein.",
+    bounds_help_current: "Die aktuellen Grenzen greifen an {n} Tagen.",
+    bounds_help_rec: "Empfehlung fürs ganze Jahr",
+    bounds_reason_prev: "frühestens {t} – damit der Keyframe nicht vor {kf} rutscht ({kf} kommt an manchen Tagen erst um {ref})",
+    bounds_reason_next: "spätestens {t} – damit der Keyframe nicht hinter {kf} rutscht ({kf} kommt an manchen Tagen schon um {ref})",
+    bounds_reason_missingLo: "frühestens {t} – Ersatzzeit für die Tage ohne Ereignis",
+    bounds_reason_missingHi: "spätestens {t} – Ersatzzeit für die Tage ohne Ereignis",
+    bounds_reason_none: "Keine Grenze nötig: Der Keyframe bleibt das ganze Jahr zwischen seinen Nachbarn, und das Ereignis tritt jeden Tag ein.",
+    bounds_reason_impossible: "Zwischen {prev} und {next} bleibt übers Jahr kein Zeitfenster frei – hier ist eine Gruppe die bessere Lösung.",
+    bounds_apply: "Empfehlung übernehmen",
     hint_title: "Hinweise",
     hint_mixed_pill: "Gemischte Modi",
     hint_mixed_modes: "{g} mischt Modi ({modes}). Je nachdem, welcher Keyframe gewinnt, ändert sich der Verlauf davor und danach – am besten allen Mitgliedern denselben Modus geben.",
@@ -1396,6 +1432,19 @@ const translations = {
     conflict_action_earliest: "Group: earlier applies",
     conflict_action_latest: "Group: later applies",
     conflict_action_all: "Allow both",
+    bounds_help_intro: "Not before / not after limit this keyframe's sun time (event + offset) to a window. Empty = no bound. If the event does not occur, the bound is used as stand-in time.",
+    bounds_help_never: "The event never occurs at this location in {year} – the keyframe only fires via a bound.",
+    bounds_help_range: "In {year} without bounds: {min} – {max}, median {median}.",
+    bounds_help_missing: "On {n} days the event does not occur.",
+    bounds_help_current: "The current bounds apply on {n} days.",
+    bounds_help_rec: "Recommendation for the whole year",
+    bounds_reason_prev: "not before {t} – so the keyframe does not slip before {kf} ({kf} comes as late as {ref} on some days)",
+    bounds_reason_next: "not after {t} – so the keyframe does not slip behind {kf} ({kf} comes as early as {ref} on some days)",
+    bounds_reason_missingLo: "not before {t} – stand-in time for days without the event",
+    bounds_reason_missingHi: "not after {t} – stand-in time for days without the event",
+    bounds_reason_none: "No bound needed: the keyframe stays between its neighbours all year and the event occurs every day.",
+    bounds_reason_impossible: "No window is left between {prev} and {next} over the year – a group is the better solution here.",
+    bounds_apply: "Apply recommendation",
     hint_title: "Hints",
     hint_mixed_pill: "Mixed modes",
     hint_mixed_modes: "{g} mixes modes ({modes}). Depending on which keyframe wins, the curve before and after it changes – ideally give all members the same mode.",
@@ -1608,6 +1657,19 @@ const translations = {
     conflict_action_earliest: "Grupo: el anterior se aplica",
     conflict_action_latest: "Grupo: el posterior se aplica",
     conflict_action_all: "Permitir ambos",
+    bounds_help_intro: "No antes de / no después de limitan la hora solar de este keyframe (evento + desfase) a una ventana. Vacío = sin límite. Si el evento no ocurre, el límite se usa como hora sustituta.",
+    bounds_help_never: "El evento nunca ocurre en esta ubicación en {year} – el keyframe solo se activa mediante un límite.",
+    bounds_help_range: "En {year} sin límites: {min} – {max}, mediana {median}.",
+    bounds_help_missing: "Durante {n} días el evento no ocurre.",
+    bounds_help_current: "Los límites actuales se aplican durante {n} días.",
+    bounds_help_rec: "Recomendación para todo el año",
+    bounds_reason_prev: "no antes de {t} – para que el keyframe no pase por delante de {kf} ({kf} llega algunos días hasta las {ref})",
+    bounds_reason_next: "no después de {t} – para que el keyframe no quede detrás de {kf} ({kf} llega algunos días ya a las {ref})",
+    bounds_reason_missingLo: "no antes de {t} – hora sustituta para los días sin el evento",
+    bounds_reason_missingHi: "no después de {t} – hora sustituta para los días sin el evento",
+    bounds_reason_none: "No hace falta límite: el keyframe se mantiene entre sus vecinos todo el año y el evento ocurre cada día.",
+    bounds_reason_impossible: "No queda ventana entre {prev} y {next} a lo largo del año – aquí es mejor crear un grupo.",
+    bounds_apply: "Aplicar recomendación",
     hint_title: "Avisos",
     hint_mixed_pill: "Modos mezclados",
     hint_mixed_modes: "{g} mezcla modos ({modes}). Según qué keyframe gane, cambia la curva antes y después – mejor dar a todos los miembros el mismo modo.",
@@ -2181,7 +2243,7 @@ const translations = {
           <span class="trigger-label">min</span>
           ${resolvedPill}
         </div>
-        <div class="trigger">
+        <div class="trigger bounds-row" data-index="${index}">
           <span class="trigger-label">${t('not_before')}</span>
           <input class="lkl-input bound" type="time" value="${kf.notBefore || ''}"
                  onchange="updateKeyframe(${index}, 'notBefore', this.value)">
@@ -3052,6 +3114,186 @@ const translations = {
           }
         }
       });
+    }
+
+    // ============================================================================
+    // BOUNDS ADVICE (hover on "frühestens / spätestens" of a sun keyframe)
+    // ============================================================================
+    //
+    // A sensible window for a sun keyframe follows from the other keyframes,
+    // compared DAY BY DAY over the whole year (of viewDate):
+    //   - an other keyframe that usually comes before it, but is overtaken on
+    //     some days -> "not before" its latest time on those days (+15 min),
+    //   - one that usually comes after it, but is overtaken on some days ->
+    //     "not after" its earliest time on those days (−15 min),
+    //     rounded to the quarter hour. Members of the same group are left
+    //     out — the group decides between them.
+    //   - plus a stand-in time for days on which the event does not occur.
+    // If none of this applies, no bound is needed.
+
+    /** Sun event + offset without bounds (null = the event does not occur). */
+    function rawSunMinutes(kf, dateStr) {
+      const sun = getSunTimes(dateStr);
+      const m = sun ? sun.events[kf.sunEvent] : null;
+      return m == null ? null : m + (kf.offsetMinutes || 0);
+    }
+
+    const roundUp15 = m => clamp(Math.ceil(m / 15) * 15, 0, 1439);
+    const roundDown15 = m => clamp(Math.floor(m / 15) * 15, 0, 1439);
+
+    function boundsAdvice(index) {
+      const kf = state.keyframes[index];
+      const year = parseDate(viewDate).y;
+      const days = daysInYear(year);
+      const lo = kf.notBefore ? parseTime(kf.notBefore) : null;
+      const hi = kf.notAfter ? parseTime(kf.notAfter) : null;
+
+      const own = [];
+      // Per other keyframe: days it comes before / after this one, and the
+      // pairs of times on the days where the usual order flips
+      const cmp = state.keyframes.map(() => ({ before: [], after: [] }));
+      let missing = 0, clamped = 0;
+      for (let d = 0; d < days; d++) {
+        const date = addDays(`${year}-01-01`, d);
+        const raw = rawSunMinutes(kf, date);
+        if (raw == null) { missing++; continue; }
+        own.push(raw);
+        if ((lo != null && raw < lo) || (hi != null && raw > hi)) clamped++;
+        state.keyframes.forEach((other, i) => {
+          if (i === index || (kf.group && other.group === kf.group)) return;
+          const m = resolveKeyframeMinutes(other, date);
+          if (m == null || m === raw) return;
+          (m < raw ? cmp[i].before : cmp[i].after).push(m);
+        });
+      }
+      if (!own.length) return { year, missing, noEvent: true };
+
+      const sorted = [...own].sort((a, b) => a - b);
+      const self = { min: sorted[0], max: sorted[sorted.length - 1], median: sorted[Math.floor(sorted.length / 2)] };
+
+      // An other keyframe that usually comes BEFORE but is overtaken on some
+      // days needs "not before"; one that usually comes AFTER, "not after".
+      let loFrom = null, hiFrom = null;
+      cmp.forEach((c, i) => {
+        if (!c.before.length || !c.after.length) return;   // order never flips
+        if (c.before.length >= c.after.length) {
+          const ref = Math.max(...c.after);                  // latest time it is overtaken at
+          if (!loFrom || ref > loFrom.ref) loFrom = { kf: i, ref };
+        } else {
+          const ref = Math.min(...c.before);
+          if (!hiFrom || ref < hiFrom.ref) hiFrom = { kf: i, ref };
+        }
+      });
+
+      const reasons = [];
+      let recLo = null, recHi = null;
+      const prev = loFrom, next = hiFrom;
+      if (loFrom) {
+        recLo = roundUp15(loFrom.ref + 15);
+        reasons.push({ type: 'prev', time: recLo, kf: loFrom.kf, ref: loFrom.ref });
+      }
+      if (hiFrom) {
+        recHi = roundDown15(hiFrom.ref - 15);
+        reasons.push({ type: 'next', time: recHi, kf: hiFrom.kf, ref: hiFrom.ref });
+      }
+      if (missing) {
+        if (KfAstro.EVENTS[kf.sunEvent].rising) {
+          if (recLo == null) { recLo = roundDown15(self.min); reasons.push({ type: 'missingLo', time: recLo }); }
+        } else if (recHi == null) {
+          recHi = roundUp15(self.max);
+          reasons.push({ type: 'missingHi', time: recHi });
+        }
+      }
+      const impossible = recLo != null && recHi != null && recLo >= recHi;
+      return { year, missing, clamped, ...self, prev, next, recLo, recHi, reasons, impossible };
+    }
+
+    function boundsTipHtml(index) {
+      const kf = state.keyframes[index];
+      const a = boundsAdvice(index);
+      const num = i => `<strong>#${i + 1}</strong>`;
+      const time = m => `<span class="lkl-mono">${formatTime(m)}</span>`;
+
+      let html = `<p>${t('bounds_help_intro')}</p>`;
+      if (a.noEvent) return html + `<p>${t('bounds_help_never').replace('{year}', a.year)}</p>`;
+
+      html += `<p>${t('bounds_help_range')
+        .replace('{year}', a.year).replace('{min}', time(a.min))
+        .replace('{max}', time(a.max)).replace('{median}', time(a.median))}`;
+      if (a.missing) html += ` ${t('bounds_help_missing').replace('{n}', a.missing)}`;
+      html += '</p>';
+      if (kf.notBefore || kf.notAfter) {
+        html += `<p>${t('bounds_help_current').replace('{n}', a.clamped)}</p>`;
+      }
+
+      html += `<p><strong>${t('bounds_help_rec')}:</strong></p>`;
+      if (a.impossible) {
+        return html + `<p>${t('bounds_reason_impossible')
+          .replace('{prev}', num(a.prev.kf)).replace('{next}', num(a.next.kf))}</p>`;
+      }
+      if (!a.reasons.length) return html + `<p>${t('bounds_reason_none')}</p>`;
+
+      const reasonText = r => t('bounds_reason_' + r.type)
+        .replace('{t}', time(r.time))
+        .replace(/\{kf\}/g, r.kf != null ? num(r.kf) : '')
+        .replace('{ref}', r.ref != null ? time(r.ref) : '');
+      return html + `
+        <ul>${a.reasons.map(r => `<li>${reasonText(r)}</li>`).join('')}</ul>
+        <button class="lkl-btn is-small is-primary" onclick="applyBoundsAdvice(${index})">${t('bounds_apply')}</button>`;
+    }
+
+    function applyBoundsAdvice(index) {
+      const a = boundsAdvice(index);
+      if (a.noEvent || a.impossible) return;
+      const kf = state.keyframes[index];
+      kf.notBefore = a.recLo != null ? formatTime(a.recLo) : '';
+      kf.notAfter = a.recHi != null ? formatTime(a.recHi) : '';
+      document.getElementById('boundsTip').hidden = true;
+      saveState();
+      updateUI();
+    }
+
+    function setupBoundsTip() {
+      const tip = document.getElementById('boundsTip');
+      const container = document.getElementById('keyframesContainer');
+      let hideTimer = null, current = null;
+
+      const show = row => {
+        clearTimeout(hideTimer);
+        const index = +row.dataset.index;
+        if (current !== index || tip.hidden) {
+          tip.innerHTML = boundsTipHtml(index);
+          current = index;
+        }
+        tip.hidden = false;
+        const r = row.getBoundingClientRect();
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - tip.offsetWidth - 8));
+        const below = r.bottom + 6;
+        const top = below + tip.offsetHeight > window.innerHeight - 8 ? r.top - tip.offsetHeight - 6 : below;
+        tip.style.left = `${left}px`;
+        tip.style.top = `${Math.max(8, top)}px`;
+      };
+      const hideSoon = () => {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { tip.hidden = true; current = null; }, 250);
+      };
+
+      container.addEventListener('mouseover', e => {
+        const row = e.target.closest('.bounds-row');
+        if (row) show(row);
+      });
+      container.addEventListener('mouseout', e => {
+        const row = e.target.closest('.bounds-row');
+        if (row && !row.contains(e.relatedTarget)) hideSoon();
+      });
+      container.addEventListener('focusin', e => {
+        const row = e.target.closest('.bounds-row');
+        if (row) show(row);
+      });
+      container.addEventListener('focusout', hideSoon);
+      tip.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+      tip.addEventListener('mouseleave', hideSoon);
+      window.addEventListener('scroll', () => { tip.hidden = true; current = null; }, { passive: true });
     }
 
     // ============================================================================
@@ -4024,6 +4266,7 @@ const translations = {
 
     fillTimeZoneList();
     setupYearView();
+    setupBoundsTip();
     loadState();
     setLanguage(currentLang);  // Initialize i18n
     setupThemeControls();
