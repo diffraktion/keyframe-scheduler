@@ -17,7 +17,11 @@
 - Web app: hints for setups that silently change the curve over the year — groups mixing modes, interpolate keyframes whose predecessor changes with the day (unless an open conflict already explains it), and interpolations running across midnight
 - Web app: three selectable examples — LKL office profile "Büroprofil Lichtdusche" (local time, two light showers), sun only, mixed (with conflicts in Berlin); loading an example also sets the schedule name
 - Export: keyframe `id` and `group`, plus a `groups` array with each group's rule
-- Export: `location` block and `trigger`/`sunEvent`/`offsetMinutes`/`notBefore`/`notAfter` per keyframe; `time` carries today's resolved time as fallback (HA does not evaluate sun triggers yet)
+- Export: `location` block and `trigger`/`sunEvent`/`offsetMinutes`/`notBefore`/`notAfter` per keyframe; `time` carries today's resolved time as fallback for older integration versions
+- Integration: sun keyframes and keyframe groups — `astro.py` (1:1 port of the web app's sun model, identical times), `scheduler.resolve_day` resolves each day's keyframes (sun event + offset, bounds, fallback, group rules); evaluator and coordinator work on the resolved keyframes of today/tomorrow, so update times follow the sun day by day
+- Integration: location from the schedule's `location` block, otherwise the Home Assistant home location
+- Integration: sensor attribute `keyframes_today` with today's firing times, e.g. `["07:00", "22:03 (sunset +30 min)"]`
+- Tests: `tests/` with unit tests for sun times, resolution, groups, evaluation and coordinator events (`python -m unittest discover -s tests`, no Home Assistant needed)
 
 #### Fixed
 - Web app simulation: value froze at midnight when the day's last keyframe was a transition followed by interpolate keyframes (wrapped keyframes lacked their index/day shift) — the curve now continues across midnight
@@ -35,6 +39,7 @@
 
 #### Fixed (integration)
 - The evaluator now takes the time of day from the local wall clock instead of counting minutes from the midnight at which it was created — after a DST switch the schedule no longer runs one hour off until HA is restarted
+- Coordinator: a transition that has already started is now stepped through to its end (previously only the next day's occurrence of the keyframe was considered)
 
 ---
 

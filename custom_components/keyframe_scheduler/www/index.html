@@ -3624,8 +3624,9 @@ const translations = {
             transitionDirection: kf.transitionDirection || 'after'
           };
           if (kf.trigger === 'sun') {
-            // The HA integration does not evaluate sun triggers yet and reads
-            // `time` only — so `time` carries today's resolved value as fallback.
+            // The integration resolves sun triggers itself (scheduler.py,
+            // resolve_day). `time` carries today's resolved value for older
+            // integration versions that only read `time`.
             const m = resolveKeyframeMinutes(kf, today);
             if (m != null) out.time = formatTime(m);
             Object.assign(out, {

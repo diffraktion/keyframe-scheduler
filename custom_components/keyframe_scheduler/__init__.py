@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,7 +29,7 @@ from .const import (
     SERVICE_SET_SCHEDULE,
     SERVICE_UPLOAD_FROM_FILE,
 )
-from .scheduler import Evaluator, kelvin_to_mired, spec_from_dict
+from .scheduler import Evaluator, Keyframe, kelvin_to_mired, spec_from_dict
 from .store import ScheduleStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -103,27 +104,34 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
         """Parse HH:MM to minutes."""
         h, m = map(int, time_str.split(':'))
         return h * 60 + m
-    
-    def _get_next_occurrence(self, time_str: str, after: datetime) -> datetime:
-        """Get next occurrence of HH:MM after datetime."""
-        target_minutes = self._parse_time(time_str)
-        
-        result = after.replace(
-            hour=target_minutes // 60,
-            minute=target_minutes % 60,
-            second=0,
-            microsecond=0
-        )
-        
-        if result <= after:
-            result += timedelta(days=1)
-        
+
+    @staticmethod
+    def _same_keyframe(a: Keyframe, b: Keyframe) -> bool:
+        """Same schedule entry, ignoring the (daily resolved) time."""
+        return replace(a, time="") == replace(b, time="")
+
+    def _occurrences(self, now: datetime) -> List[Tuple[Keyframe, datetime]]:
+        """Resolved keyframes of today and tomorrow with their local datetimes.
+
+        Sun keyframes and groups make the firing times differ from day to day,
+        so every day is resolved on its own (see scheduler.resolve_day).
+        """
+        local = self.evaluator.local_now(now)
+        result = []
+        for offset in (0, 1):
+            day = local.date() + timedelta(days=offset)
+            for kf in self.evaluator.keyframes_for(day):
+                h, m = map(int, kf.time.split(':'))
+                result.append((kf, datetime(day.year, day.month, day.day, h, m, tzinfo=local.tzinfo)))
+        result.sort(key=lambda o: o[1])
         return result
-    
+
     def _find_keyframe_segment(self, now: datetime):
-        """Find previous and next keyframe."""
-        sorted_kf = sorted(self.spec.keyframes, key=lambda k: self._parse_time(k.time))
-        now_minutes = now.hour * 60 + now.minute
+        """Find previous and next keyframe of today's resolved keyframes."""
+        local = self.evaluator.local_now(now)
+        today = self.evaluator.keyframes_for(local.date())
+        sorted_kf = sorted(today, key=lambda k: self._parse_time(k.time))
+        now_minutes = local.hour * 60 + local.minute
         
         prev_kf = None
         next_kf = None
@@ -207,13 +215,12 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
     def _calculate_next_update_time(self, now: datetime) -> Optional[datetime]:
         """Calculate next update time."""
         events = []
-        
-        sorted_kf = sorted(self.spec.keyframes, key=lambda k: self._parse_time(k.time))
-        
-        # Transition events
-        for kf in sorted_kf:
-            kf_dt = self._get_next_occurrence(kf.time, now)
-            
+
+        occurrences = self._occurrences(now)
+
+        # Transition events (today's occurrence covers a transition that is
+        # already running, tomorrow's the next one)
+        for kf, kf_dt in occurrences:
             trans_events = self._calculate_transition_events(kf, kf_dt, now)
             events.extend(trans_events)
             
@@ -240,9 +247,16 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
                 # After transition ends, interpolate to next keyframe if it's interpolate mode
                 should_interpolate = True
         
+        next_kf_dt = None
         if should_interpolate:
-            next_kf_dt = self._get_next_occurrence(next_kf.time, now)
-            
+            next_kf_dt = next(
+                (dt for kf, dt in occurrences if dt > now and self._same_keyframe(kf, next_kf)),
+                None,
+            )
+            should_interpolate = next_kf_dt is not None
+
+        if should_interpolate:
+
             # CRITICAL: Adjust interval based on hardware limits!
             # If hardware max is less than user's stepMinutes, use hardware max
             # to avoid flickering from interrupted transitions
@@ -340,13 +354,26 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
             )
         
         kelvin_int = int(round(values.kelvin))
-        
+
+        # Today's firing times, e.g. ["06:00", "19:29 (sunset +30 min)"]
+        keyframes_today = []
+        for kf in sorted(
+            self.evaluator.keyframes_for(self.evaluator.local_now(now).date()),
+            key=lambda k: self._parse_time(k.time),
+        ):
+            label = kf.time
+            if kf.trigger == "sun":
+                offset = f" {kf.offset_minutes:+d} min" if kf.offset_minutes else ""
+                label += f" ({kf.sun_event}{offset})"
+            keyframes_today.append(label)
+
         return {
             "kelvin": kelvin_int,
             "mired": kelvin_to_mired(kelvin_int),
             "brightness": float(values.dim),
             "transition_seconds": int(transition_seconds),
             "next_change": next_update or (now + timedelta(seconds=self.user_step_seconds)),
+            "keyframes_today": keyframes_today,
         }
     
     async def async_shutdown(self):
@@ -358,6 +385,14 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
 
 _PANEL_URL_PATH = "keyframe-scheduler"
 _STATIC_URL_PATH = "/keyframe_scheduler"
+
+
+def _home_location(hass: HomeAssistant) -> Optional[Tuple[float, float]]:
+    """Home location configured in HA — used for sun keyframes when the
+    schedule file carries no location of its own."""
+    if hass.config.latitude is None or hass.config.longitude is None:
+        return None
+    return (float(hass.config.latitude), float(hass.config.longitude))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -427,7 +462,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Create evaluator
     try:
-        spec = spec_from_dict(schedule_dict)
+        spec = spec_from_dict(schedule_dict, _home_location(hass))
         evaluator = Evaluator(spec, DEFAULT_KELVIN, DEFAULT_DIM)
     except Exception as err:
         _LOGGER.error("Failed to create evaluator: %s", err)
@@ -474,7 +509,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
             # Validate
             try:
-                spec = spec_from_dict(schedule_obj)
+                spec = spec_from_dict(schedule_obj, _home_location(hass))
             except Exception as err:
                 raise ValueError(f"Invalid schedule: {err}") from err
 
@@ -552,7 +587,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
             # Validate schedule
             try:
-                spec = spec_from_dict(schedule_obj)
+                spec = spec_from_dict(schedule_obj, _home_location(hass))
             except Exception as err:
                 raise ValueError(f"Invalid schedule format: {err}") from err
 
