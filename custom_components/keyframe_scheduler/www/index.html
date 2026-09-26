@@ -107,6 +107,15 @@
 
     /* ---- Keyframe table ------------------------------------------------------ */
     .keyframes-table td { vertical-align: middle; }
+    /* Handle, number, group and trigger sit on the row's first line; the
+       value columns stay centred. .cell-line gives plain text the height of
+       a form control so it lines up with the selects next to it. */
+    .keyframes-table td.is-top { vertical-align: top; }
+    .keyframes-table .cell-line {
+      display: flex;
+      align-items: center;
+      min-height: calc(var(--lkl-fs-md) * var(--lkl-lh-base) + 2 * var(--lkl-space-1) + 2px);
+    }
     .keyframes-table tbody tr { transition: opacity var(--lkl-dur); }
     .keyframes-table tbody tr:hover td { background: var(--lkl-surface-2); }
     .keyframes-table tbody tr.is-dragging { opacity: .5; }
@@ -280,7 +289,9 @@
     .bounds-tip .lkl-mono { color: var(--lkl-text); }
     .bounds-tip p { margin: 0 0 var(--lkl-space-2); }
     .bounds-tip ul { margin: 0 0 var(--lkl-space-2); padding-left: var(--lkl-space-5); }
-    .bounds-row .trigger-label { cursor: help; }
+    .bounds-row .trigger-label, .offset-row .trigger-label { cursor: help; }
+    /* First label of the offset and bounds rows share a width, so the fields line up */
+    .trigger .trigger-label.is-lead { min-width: 5.5em; }
 
     .year-tooltip {
       position: absolute;
@@ -1108,7 +1119,6 @@ const translations = {
     loc_browser_failed: "Browser-Standort nicht verfügbar.",
     trigger_time: "Uhrzeit",
     trigger_sun: "Sonne",
-    offset_title: "Versatz in Minuten (negativ = früher)",
     not_before: "frühestens",
     not_after: "spätestens",
     event_skipped: "entfällt",
@@ -1220,6 +1230,14 @@ const translations = {
     bounds_reason_none: "Keine Grenze nötig: Der Keyframe bleibt das ganze Jahr zwischen seinen Nachbarn, und das Ereignis tritt jeden Tag ein.",
     bounds_reason_impossible: "Zwischen {prev} und {next} bleibt übers Jahr kein Zeitfenster frei – hier ist eine Gruppe die bessere Lösung.",
     bounds_apply: "Empfehlung übernehmen",
+    offset_label: "Versatz",
+    offset_help_intro: "Versatz zum Sonnenereignis in Minuten: positiv = später, negativ = früher (bis ±12 h). Die Kapsel daneben zeigt die Uhrzeit am gewählten Tag – Grenzen schon eingerechnet.",
+    offset_help_calc: "Am {date}: {event} {eventTime} {offset} = {result}",
+    offset_help_raised: "Durch „frühestens“ auf {t} angehoben.",
+    offset_help_lowered: "Durch „spätestens“ auf {t} begrenzt.",
+    offset_help_missing: "Am {date} findet das Ereignis nicht statt –",
+    offset_help_fallback: "es gilt die Grenze {t}.",
+    offset_help_skipped: "ohne Grenze entfällt der Keyframe an diesem Tag.",
     hint_title: "Hinweise",
     hint_mixed_pill: "Gemischte Modi",
     hint_mixed_modes: "{g} mischt Modi ({modes}). Je nachdem, welcher Keyframe gewinnt, ändert sich der Verlauf davor und danach – am besten allen Mitgliedern denselben Modus geben.",
@@ -1333,7 +1351,6 @@ const translations = {
     loc_browser_failed: "Browser location not available.",
     trigger_time: "Time",
     trigger_sun: "Sun",
-    offset_title: "Offset in minutes (negative = earlier)",
     not_before: "not before",
     not_after: "not after",
     event_skipped: "skipped",
@@ -1445,6 +1462,14 @@ const translations = {
     bounds_reason_none: "No bound needed: the keyframe stays between its neighbours all year and the event occurs every day.",
     bounds_reason_impossible: "No window is left between {prev} and {next} over the year – a group is the better solution here.",
     bounds_apply: "Apply recommendation",
+    offset_label: "Offset",
+    offset_help_intro: "Offset to the sun event in minutes: positive = later, negative = earlier (up to ±12 h). The pill next to it shows the time on the selected day – bounds already applied.",
+    offset_help_calc: "On {date}: {event} {eventTime} {offset} = {result}",
+    offset_help_raised: "Raised to {t} by \"not before\".",
+    offset_help_lowered: "Limited to {t} by \"not after\".",
+    offset_help_missing: "On {date} the event does not occur –",
+    offset_help_fallback: "the bound {t} applies.",
+    offset_help_skipped: "without a bound the keyframe is skipped that day.",
     hint_title: "Hints",
     hint_mixed_pill: "Mixed modes",
     hint_mixed_modes: "{g} mixes modes ({modes}). Depending on which keyframe wins, the curve before and after it changes – ideally give all members the same mode.",
@@ -1558,7 +1583,6 @@ const translations = {
     loc_browser_failed: "Ubicación del navegador no disponible.",
     trigger_time: "Hora",
     trigger_sun: "Sol",
-    offset_title: "Desfase en minutos (negativo = antes)",
     not_before: "no antes de",
     not_after: "no después de",
     event_skipped: "omitido",
@@ -1670,6 +1694,14 @@ const translations = {
     bounds_reason_none: "No hace falta límite: el keyframe se mantiene entre sus vecinos todo el año y el evento ocurre cada día.",
     bounds_reason_impossible: "No queda ventana entre {prev} y {next} a lo largo del año – aquí es mejor crear un grupo.",
     bounds_apply: "Aplicar recomendación",
+    offset_label: "Desfase",
+    offset_help_intro: "Desfase respecto al evento solar en minutos: positivo = más tarde, negativo = antes (hasta ±12 h). La etiqueta de al lado muestra la hora en el día seleccionado – con los límites ya aplicados.",
+    offset_help_calc: "El {date}: {event} {eventTime} {offset} = {result}",
+    offset_help_raised: "Adelantado a {t} por „no antes de“.",
+    offset_help_lowered: "Limitado a {t} por „no después de“.",
+    offset_help_missing: "El {date} el evento no ocurre –",
+    offset_help_fallback: "se aplica el límite {t}.",
+    offset_help_skipped: "sin límite, el keyframe se omite ese día.",
     hint_title: "Avisos",
     hint_mixed_pill: "Modos mezclados",
     hint_mixed_modes: "{g} mezcla modos ({modes}). Según qué keyframe gane, cambia la curva antes y después – mejor dar a todos los miembros el mismo modo.",
@@ -2229,7 +2261,7 @@ const translations = {
       const resolvedPill = resolved == null
         ? `<span class="lkl-pill is-warn" title="${t('resolved_on')}">${t('event_skipped')}</span>`
         : skippedByRule ? rulePill
-        : `<span class="lkl-pill is-accent lkl-mono" title="${t('resolved_on')}">→ ${formatTime(resolved)}</span>`;
+        : `<span class="lkl-pill is-accent" title="${t('resolved_on')}">${formatDate(viewDate, { day: '2-digit', month: '2-digit' })} → <span class="lkl-mono">${formatTime(resolved)}</span></span>`;
 
       return `
         <div class="trigger">
@@ -2237,14 +2269,17 @@ const translations = {
           <select class="lkl-select event-select" onchange="updateKeyframe(${index}, 'sunEvent', this.value)">
             ${eventOptions}
           </select>
+        </div>
+        <div class="trigger offset-row" data-index="${index}">
+          <span class="trigger-label is-lead">${t('offset_label')}</span>
           <input class="lkl-input offset" type="number" step="5" min="-720" max="720"
-                 value="${kf.offsetMinutes || 0}" title="${t('offset_title')}"
+                 value="${kf.offsetMinutes || 0}"
                  onchange="updateKeyframe(${index}, 'offsetMinutes', this.value)">
           <span class="trigger-label">min</span>
           ${resolvedPill}
         </div>
         <div class="trigger bounds-row" data-index="${index}">
-          <span class="trigger-label">${t('not_before')}</span>
+          <span class="trigger-label is-lead">${t('not_before')}</span>
           <input class="lkl-input bound" type="time" value="${kf.notBefore || ''}"
                  onchange="updateKeyframe(${index}, 'notBefore', this.value)">
           <span class="trigger-label">${t('not_after')}</span>
@@ -2383,8 +2418,8 @@ const translations = {
               <th style="width: 40px;">#</th>
               <th style="width: 60px;">${t('th_group')}</th>
               <th>${t('th_time')}</th>
-              <th style="width: 100px;">${t('th_kelvin')}</th>
               <th style="width: 100px;">${t('th_brightness')}</th>
+              <th style="width: 100px;">${t('th_kelvin')}</th>
               <th style="width: 120px;">${t('th_mode')}</th>
               <th style="width: 150px;">${t('th_transition')}</th>
               <th style="width: 100px;">${t('th_direction')}</th>
@@ -2401,24 +2436,24 @@ const translations = {
         
         html += `
           <tr draggable="true" data-index="${index}">
-            <td><span class="drag-handle">⋮⋮</span></td>
-            <td><span class="row-number">${index + 1}</span></td>
-            <td>
+            <td class="is-top"><span class="cell-line drag-handle">⋮⋮</span></td>
+            <td class="is-top"><span class="cell-line row-number">${index + 1}</span></td>
+            <td class="is-top">
               <select class="lkl-select group-select" title="${t('group_title')}" onchange="updateKeyframe(${index}, 'group', this.value)">
                 <option value="" ${kf.group ? '' : 'selected'}>–</option>
                 ${GROUP_IDS.map(id => `<option value="${id}" ${kf.group === id ? 'selected' : ''}>${id}</option>`).join('')}
               </select>
             </td>
-            <td class="trigger-td">${renderTriggerCell(kf, index)}</td>
-            <td>
-              <input class="lkl-input" type="number" min="2000" max="6500" step="100"
-                     value="${kf.kelvin}"
-                     oninput="updateKeyframe(${index}, 'kelvin', this.value)">
-            </td>
+            <td class="is-top trigger-td">${renderTriggerCell(kf, index)}</td>
             <td>
               <input class="lkl-input" type="number" min="0" max="100" step="5"
                      value="${kf.dim}"
                      oninput="updateKeyframe(${index}, 'dim', this.value)">
+            </td>
+            <td>
+              <input class="lkl-input" type="number" min="2000" max="6500" step="100"
+                     value="${kf.kelvin}"
+                     oninput="updateKeyframe(${index}, 'kelvin', this.value)">
             </td>
             <td>
               <select class="lkl-select" onchange="updateKeyframe(${index}, 'mode', this.value)">
@@ -3242,6 +3277,36 @@ const translations = {
         <button class="lkl-btn is-small is-primary" onclick="applyBoundsAdvice(${index})">${t('bounds_apply')}</button>`;
     }
 
+    /** Hover help for the offset: what it does and how the viewed day's time comes about. */
+    function offsetTipHtml(index) {
+      const kf = state.keyframes[index];
+      const day = formatDate(viewDate, { day: '2-digit', month: '2-digit' });
+      const time = m => `<span class="lkl-mono">${formatTime(m)}</span>`;
+      let html = `<p>${t('offset_help_intro')}</p>`;
+
+      const sun = getSunTimes(viewDate);
+      const event = sun ? sun.events[kf.sunEvent] : null;
+      const resolved = resolveKeyframeMinutes(kf, viewDate);
+      if (event == null) {
+        return html + `<p>${t('offset_help_missing').replace('{date}', day)} ${resolved == null
+          ? t('offset_help_skipped')
+          : t('offset_help_fallback').replace('{t}', time(resolved))}</p>`;
+      }
+
+      const off = kf.offsetMinutes || 0;
+      const raw = event + off;
+      html += `<p>${t('offset_help_calc')
+        .replace('{date}', day)
+        .replace('{event}', t('sun_' + kf.sunEvent))
+        .replace('{eventTime}', time(event))
+        .replace('{offset}', `${off >= 0 ? '+' : '−'} ${Math.abs(off)} min`)
+        .replace('{result}', time(raw))}</p>`;
+      if (resolved != null && Math.round(raw) !== resolved) {
+        html += `<p>${t(resolved > raw ? 'offset_help_raised' : 'offset_help_lowered').replace('{t}', time(resolved))}</p>`;
+      }
+      return html;
+    }
+
     function applyBoundsAdvice(index) {
       const a = boundsAdvice(index);
       if (a.noEvent || a.impossible) return;
@@ -3258,12 +3323,15 @@ const translations = {
       const container = document.getElementById('keyframesContainer');
       let hideTimer = null, current = null;
 
+      const ROWS = '.bounds-row, .offset-row';
       const show = row => {
         clearTimeout(hideTimer);
         const index = +row.dataset.index;
-        if (current !== index || tip.hidden) {
-          tip.innerHTML = boundsTipHtml(index);
-          current = index;
+        const isOffset = row.classList.contains('offset-row');
+        const key = `${isOffset ? 'offset' : 'bounds'}:${index}`;
+        if (current !== key || tip.hidden) {
+          tip.innerHTML = isOffset ? offsetTipHtml(index) : boundsTipHtml(index);
+          current = key;
         }
         tip.hidden = false;
         const r = row.getBoundingClientRect();
@@ -3279,15 +3347,15 @@ const translations = {
       };
 
       container.addEventListener('mouseover', e => {
-        const row = e.target.closest('.bounds-row');
+        const row = e.target.closest(ROWS);
         if (row) show(row);
       });
       container.addEventListener('mouseout', e => {
-        const row = e.target.closest('.bounds-row');
+        const row = e.target.closest(ROWS);
         if (row && !row.contains(e.relatedTarget)) hideSoon();
       });
       container.addEventListener('focusin', e => {
-        const row = e.target.closest('.bounds-row');
+        const row = e.target.closest(ROWS);
         if (row) show(row);
       });
       container.addEventListener('focusout', hideSoon);
@@ -4036,8 +4104,8 @@ const translations = {
         
         return [
           pdfText(describeTrigger(kf)),
-          `${kf.kelvin}K`,
           `${kf.dim}%`,
+          `${kf.kelvin}K`,
           kf.mode === 'instant' ? t('mode_instant') : kf.mode === 'transition' ? t('mode_transition') : t('mode_interpolate'),
           transDisplay,
           curveDisplay
@@ -4046,7 +4114,7 @@ const translations = {
       
       doc.autoTable({
         startY: yPos,
-        head: [[t('pdf_time'), t('pdf_kelvin'), t('pdf_brightness'), t('pdf_mode'), t('pdf_transition'), t('pdf_curve')]],
+        head: [[t('pdf_time'), t('pdf_brightness'), t('pdf_kelvin'), t('pdf_mode'), t('pdf_transition'), t('pdf_curve')]],
         body: tableData,
         margin: { left: margin, right: margin },
         styles: { fontSize: 9, cellPadding: 2 },

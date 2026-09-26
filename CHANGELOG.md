@@ -16,6 +16,7 @@
 - Web app: ungrouped conflicts are marked red on the days of the less frequent order — strip and traces in the year view, markers and notice in the day view, notice with "create group" above the year view
 - Web app: hints for setups that silently change the curve over the year — groups mixing modes, interpolate keyframes whose predecessor changes with the day (unless an open conflict already explains it), and interpolations running across midnight
 - Web app: hover help on the not-before / not-after bounds of sun keyframes — the keyframe's range over the year, days without the event, and a one-click recommendation derived day by day from the other keyframes (so it never overtakes a neighbour) plus a stand-in time for days without the event
+- Web app: sun keyframes show a labelled offset ("Versatz … min") with hover help that works out the viewed day's time, and the resolved time with its date ("27.09. → 07:30")
 - Web app: three selectable examples — LKL office profile "Büroprofil Lichtdusche" (local time, two light showers), sun only, mixed (with conflicts in Berlin); loading an example also sets the schedule name
 - Export: keyframe `id` and `group`, plus a `groups` array with each group's rule
 - Export: `location` block and `trigger`/`sunEvent`/`offsetMinutes`/`notBefore`/`notAfter` per keyframe; `time` carries today's resolved time as fallback for older integration versions
@@ -33,6 +34,7 @@
 #### Changed
 - Web app restyled on the LKL UI style guide 1.0.0 (`www/styleguide/`): design tokens, glass/paper skins, day/night/auto theme with switcher in the header
 - Chart colours follow the active theme; PDF export always renders the chart on white
+- Keyframe table: brightness before colour temperature (also in the PDF); handle, number, group and trigger aligned to the top of the row, value columns centred
 - Day chart: colour temperature on a real Kelvin axis spanning the schedule's own range (was normalised 2000–6500 K → 0–100); summary tiles below the chart removed
 
 #### Removed
