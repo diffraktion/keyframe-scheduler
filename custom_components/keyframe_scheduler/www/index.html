@@ -289,8 +289,8 @@
     .bounds-tip p { margin: 0 0 var(--lkl-space-2); }
     .bounds-tip ul { margin: 0 0 var(--lkl-space-2); padding-left: var(--lkl-space-5); }
     .bounds-row .trigger-label, .offset-row .trigger-label { cursor: help; }
-    /* First label of the offset and bounds rows share a width, so the fields line up */
-    .trigger .trigger-label.is-lead { min-width: 5.5em; }
+    /* Labels follow their field; a little extra room before the next field */
+    .trigger .trigger-label.is-after { margin-right: var(--lkl-space-2); }
 
     .year-tooltip {
       position: absolute;
@@ -2248,19 +2248,18 @@ const translations = {
           </select>
         </div>
         <div class="trigger offset-row" data-index="${index}">
-          <span class="trigger-label is-lead">${t('offset_label')}</span>
           <input class="lkl-input offset" type="number" step="5" min="-720" max="720"
                  value="${kf.offsetMinutes || 0}"
                  onchange="updateKeyframe(${index}, 'offsetMinutes', this.value)">
-          <span class="trigger-label">min</span>
+          <span class="trigger-label">min ${t('offset_label')}</span>
         </div>
         <div class="trigger bounds-row" data-index="${index}">
-          <span class="trigger-label is-lead">${t('not_before')}</span>
           <input class="lkl-input bound" type="time" value="${kf.notBefore || ''}"
                  onchange="updateKeyframe(${index}, 'notBefore', this.value)">
-          <span class="trigger-label">${t('not_after')}</span>
+          <span class="trigger-label is-after">${t('not_before')}</span>
           <input class="lkl-input bound" type="time" value="${kf.notAfter || ''}"
                  onchange="updateKeyframe(${index}, 'notAfter', this.value)">
+          <span class="trigger-label">${t('not_after')}</span>
         </div>`;
     }
 
