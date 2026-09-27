@@ -4,7 +4,13 @@
 
 ### [Unreleased]
 
+#### Breaking
+- **The integration controls the lights itself; the blueprint `keyframe_smart_light_follower` is removed.** Delete existing blueprint automations, otherwise two places control the same light. The previous follow lights are migrated (type from the previous hardware limit) — check them under Configure.
+
 #### Added
+- Integration: direct light control — lights and light groups (expanded into members) are assigned in the options, each with a light type (DALI, DALI-2 Extended, Casambi, Zigbee, Hue, Z-Wave, Generic) that limits the fade per command and the minimum interval between commands (adjustable per instance). Only lights that are on get commands, the integration never switches lights on; a light that is switched on takes the current values at once
+- Integration: manual changes (user, scene, other automation; optionally changes the light reports itself, e.g. a wall dimmer) pause the light via its follow switch; off/on always resumes, optionally also after N minutes or at the next keyframe; a follow switch turned off on purpose stays off (`pause_reason`)
+- Integration: services `apply` and `set_manual_control`
 - Web app: sun-based keyframes (dawn/dusk twilights, sunrise/sunset, golden hour, solar noon) with offset and optional not-before/not-after bounds
 - Web app: location setting (latitude, longitude, time zone), prefilled from Home Assistant when opened as panel
 - Web app: year overview heatmap — artificial light brightness, artificial light colour temperature and potential clear-sky daylight (log lux scale) — with sun curves; click a day to open it in the day view
@@ -42,6 +48,8 @@
 - One-shot mode ("Wiederholung: Einmalig", `wrapAround: false`) and `startDateTime`, in the web app and the integration: every schedule is a daily profile that continues across midnight. Both fields in older files are ignored; export no longer writes them.
 
 #### Fixed (integration)
+- `set_schedule` / `upload_from_file` now update the running coordinator in place — sensors (and lights) pick up the new schedule without reloading the integration
+- Minimum Home Assistant version corrected to 2024.7 (the integration uses `StaticPathConfig`)
 - The evaluator now takes the time of day from the local wall clock instead of counting minutes from the midnight at which it was created — after a DST switch the schedule no longer runs one hour off until HA is restarted
 - Coordinator: a transition that has already started is now stepped through to its end (previously only the next day's occurrence of the keyframe was considered)
 

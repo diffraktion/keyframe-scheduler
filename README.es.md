@@ -1,8 +1,8 @@
 # Keyframe Scheduler
 
-Integración de Home Assistant para la interpolación temporal de valores de luz basada en fotogramas clave (brillo, temperatura de color).
+Integración de Home Assistant para el control de iluminación basado en keyframes: brillo y temperatura de color a lo largo del día, por hora del reloj o según la posición del sol.
 
-Compatible con **todas** las entidades de luz de HA — PICOlightnode, Philips Hue, Zigbee, WLED, DMX y luces estándar.
+Funciona con **todas** las entidades de luz de HA — DALI, Casambi, Zigbee, Philips Hue, Z-Wave, WLED, PICOlightnode y luces estándar.
 
 > Also available in [English](README.md) | Auch verfügbar auf [Deutsch](README.de.md)
 
@@ -10,7 +10,11 @@ Compatible con **todas** las entidades de luz de HA — PICOlightnode, Philips H
 
 ## Cómo funciona
 
-Defines un conjunto de fotogramas clave — cada uno con una hora, brillo y temperatura de color. La integración interpola suavemente entre ellos y publica los valores objetivo actuales como sensores. Un blueprint de automatización incluido lee esos sensores y aplica los valores a tus luces.
+Defines keyframes — cada uno con un disparador, brillo y temperatura de color. La integración interpola entre ellos y **controla ella misma las luces asignadas**. No hace falta ninguna automatización ni blueprint.
+
+- **Disparadores:** una hora fija o un evento solar en la ubicación (crepúsculos, salida del sol, mediodía solar, hora dorada, puesta del sol, medianoche solar) con un desfase en minutos y límites opcionales *no antes de / no después de*.
+- **Grupos:** los keyframes con la misma función (p. ej. «puesta del sol» y «20:00») se pueden agrupar; cada día solo se aplica el primero, el último o todos.
+- **Una instancia = un horario** para cualquier número de luces. Otra instancia solo hace falta para un horario distinto.
 
 ---
 
@@ -21,127 +25,125 @@ Defines un conjunto de fotogramas clave — cada uno con una hora, brillo y temp
 1. HACS → Integraciones → `+` → buscar **Keyframe Scheduler**
 2. Instalar → reiniciar Home Assistant
 
-### Blueprint
-
-Configuración → Automatizaciones y escenas → Blueprints → Importar blueprint:
-```
-https://github.com/mjmijh/keyframe-scheduler/blob/main/blueprints/automation/keyframe_smart_light_follower.yaml
-```
-
 ---
 
 ## Configuración
 
-### Paso 1 — Crear una instancia de Keyframe Scheduler
+### Paso 1 — Crear una instancia
 
 1. Configuración → Dispositivos y servicios → Añadir integración → **Keyframe Scheduler**
-2. Asignar un nombre (p. ej. `Oficina`)
-3. Configurar el horario mediante JSON o usar la webapp integrada
+2. Asignar un nombre (p. ej. `Sala de reuniones`)
 
-La integración crea los siguientes sensores por instancia:
+### Paso 2 — Diseñar el horario
+
+Diseña el horario en la webapp (entrada de la barra lateral **Keyframe Scheduler**) y expórtalo con **Guardar como archivo**. La webapp muestra una vista anual y una diaria con las horas solares, marca los keyframes que cambian de orden a lo largo del año y sugiere límites adecuados.
+
+### Paso 3 — Asignar horario y luces
+
+Configuración → Dispositivos y servicios → Keyframe Scheduler → **Configurar**:
+
+| Campo | Descripción |
+|-------|-------------|
+| **JSON del horario** | Pegar el contenido del archivo exportado (vacío = sin cambios) |
+| **Luces** | Las luces de esta instancia — también grupos de luces (se expanden en sus miembros) |
+| **Volver a seguir tras un cambio manual** | Solo apagando/encendiendo o con el interruptor de seguimiento · tras N minutos · en el siguiente keyframe |
+| **Detectar también cambios en el dispositivo** | Detecta p. ej. un regulador de pared en el bus (ver abajo) |
+| **Ajustar los tiempos de los tipos de luz** | Abre un paso adicional para los tiempos de cada tipo |
+
+En el paso siguiente cada luz recibe su **tipo**:
+
+| Tipo | Transición máx. | Intervalo mín. entre comandos |
+|------|-----------------|-------------------------------|
+| DALI | 90 s | 30 s |
+| DALI-2 Extended Fade | 27 min | 30 s |
+| Casambi / Bluetooth Mesh | 10 min | 30 s |
+| Zigbee | 10 min | 15 s |
+| Philips Hue | 10 min | 10 s |
+| Z-Wave | 5 min | 30 s |
+| Genérico / WiFi | 5 min | 15 s |
+
+Los intervalos son valores prudentes y se pueden ajustar por instancia. Así, luces de distintos buses pueden compartir **un** horario, p. ej. DALI y Zigbee en la misma sala de reuniones.
+
+Ubicación para los keyframes solares: la del horario; si no la tiene, la configurada en Home Assistant.
+
+---
+
+## Comportamiento de las luces
+
+- **Solo se ajustan las luces encendidas.** La integración nunca enciende una luz. Apagar en el interruptor de pared significa «apagada».
+- **Al encenderla** (app, interruptor de pared, detector de presencia …) la luz toma de inmediato los valores actuales y sigue el horario desde ese momento.
+- **Los comandos** se envían como mucho con la frecuencia que permite el tipo de luz; un fundido nunca supera su máximo.
+
+### Cambios manuales
+
+Si otra persona o sistema cambia la luz, esta se **pausa**: su interruptor de seguimiento se apaga y la integración deja de enviarle comandos.
+
+Se considera cambio manual:
+- un comando de un usuario (panel, app)
+- un comando de una escena, un script u otra automatización
+- opcionalmente un cambio que la propia luz notifica (p. ej. regulador de pared en el bus): se detecta cuando el valor notificado difiere claramente del enviado una vez terminado el fundido (> 5 % de brillo o > 150 K)
+
+No se considera cambio manual: los comandos propios de la integración ni las actualizaciones internas de PICOlightnode (`picolightnode_restore`).
+
+**Reanudar:** apagar y volver a encender la luz la reanuda **siempre**. Según el ajuste, también tras N minutos o en el siguiente keyframe.
+
+### Interruptor de seguimiento
+
+Cada luz tiene un interruptor:
+```
+switch.keyframe_<instancia>_<luz>_follow
+```
+
+| Estado | Significado |
+|--------|-------------|
+| ON | La luz sigue el horario |
+| OFF, `pause_reason: manual` | Pausada por un cambio manual — se reanuda automáticamente (ver arriba) |
+| OFF, `pause_reason: user` | Apagado a propósito — permanece apagado hasta volver a encender el interruptor |
+
+Al volver a encender el interruptor, la luz pasa de inmediato a los valores actuales con un fundido suave.
+
+---
+
+## Sensores
+
+Por instancia:
 
 | Sensor | Descripción |
 |--------|-------------|
 | `sensor.<nombre>_target_kelvin` | Temperatura de color objetivo actual en Kelvin |
 | `sensor.<nombre>_target_brightness` | Brillo objetivo actual (0–100 %) |
 | `sensor.<nombre>_target_mired` | Temperatura de color actual en mired |
-| `sensor.<nombre>_next_change` | Hora del próximo cambio programado |
+| `sensor.<nombre>_next_change` | Momento del próximo cambio de valor previsto |
 
-Todos los sensores incluyen el atributo `transition_seconds` — la duración de fundido recomendada hasta el siguiente fotograma clave.
-
-### Paso 2 — Configurar los interruptores de seguimiento (Follow Switches)
-
-Un Follow Switch controla si una luz sigue el horario o está bajo control manual.
-
-**Luces PICOlightnode** — cada luz ya tiene su propio interruptor:
-```
-switch.<nombre_luz>_externe_automation_zulassen
-```
-Seleccionarlo directamente en el blueprint. No se necesita ningún paso adicional.
-
-**Todas las demás luces** — generar Follow Switches automáticamente:
-1. Configuración → Dispositivos y servicios → Keyframe Scheduler → **Configurar**
-2. En **Follow Lights**: seleccionar las luces que deben obtener un Follow Switch
-3. Guardar → la integración se recarga
-
-Los interruptores generados siguen este patrón:
-```
-switch.keyframe_<instancia>_<luz>_follow
-```
-
-### Paso 3 — Crear una automatización de blueprint por luz
-
-1. Configuración → Automatizaciones y escenas → Crear automatización → **Desde blueprint**
-2. Seleccionar: **Keyframe Scheduler**
-
-| Parámetro | Descripción |
-|-----------|-------------|
-| **Sensor de Keyframe Scheduler** | Cualquier sensor de la instancia (p. ej. `sensor.oficina_target_kelvin`) |
-| **Luz objetivo** | La entidad de luz a controlar |
-| **Follow Switch** *(opcional)* | Interruptor PICOlightnode o interruptor Keyframe generado automáticamente |
-| **Auto-Resume** *(opcional)* | Minutos hasta la reactivación automática tras anulación manual |
-| **Sincronizar al activar** | Saltar inmediatamente a los valores actuales del horario al encender el Follow Switch |
-
-Crear una automatización de blueprint separada por cada luz.
+Atributos: `transition_seconds` (tiempo de fundido hasta la siguiente actualización) y `keyframes_today` (cuándo se activan hoy los keyframes, p. ej. `["07:00", "22:03 (sunset +30 min)"]`).
 
 ---
 
-## Comportamiento del Follow Switch
+## Servicios
 
-```
-Follow Switch ON  →  La luz sigue el horario de fotogramas clave automáticamente
-Follow Switch OFF →  Control manual (el horario se ignora)
-```
+| Servicio | Descripción |
+|----------|-------------|
+| `keyframe_scheduler.apply` | Enviar ya los valores actuales a las luces (opcionalmente una instancia / luces concretas) |
+| `keyframe_scheduler.set_manual_control` | Pausar luces (`manual: true`) o volver a seguir el horario (`manual: false`) |
+| `keyframe_scheduler.set_schedule` | Definir el horario como JSON |
+| `keyframe_scheduler.upload_from_file` | Cargar el horario desde un archivo en `/config/` |
 
-### Desactivación automática ante anulación manual
-
-Cuando un usuario cambia la luz directamente desde el panel o la app, el blueprint lo detecta y apaga el Follow Switch automáticamente.
-
-La detección usa el contexto de HA:
-- `context.user_id` presente → un usuario real desencadenó la acción
-- `context.parent_id` vacío → no hay automatización padre
-
-Solo cuando se cumplen ambas condiciones se trata como anulación manual.
-
-**No se trata como anulación manual (Follow permanece activo):**
-- El propio blueprint de Keyframe (tiene `parent_id`)
-- Actualizaciones internas de PICOlightnode
-- Otras automatizaciones (tienen `parent_id`)
-
-### Sincronización suave al reactivar
-
-Cuando el Follow Switch se vuelve a encender, la luz se desvanece hasta los valores actuales del fotograma clave en 3 segundos — sin saltos bruscos.
-
-### Auto-Resume
-
-Opcionalmente, configurar una duración de Auto-Resume. El blueprint usa el timestamp `last_changed` del propio Follow Switch — no se necesita ninguna entidad auxiliar.
-
-```
-Anulación manual a las 14:30 → Follow Switch se apaga
-Auto-Resume = 60 minutos
-→ A las 15:30 el Follow Switch se enciende automáticamente
-```
+Un horario nuevo mediante `set_schedule` o `upload_from_file` se aplica de inmediato, sin recargar la integración.
 
 ---
 
-## Múltiples luces por instancia
+## Migración desde el blueprint
 
-Una instancia = un horario compartido. Cada luz obtiene su propia automatización de blueprint y Follow Switch, controlables de forma independiente:
+Hasta la versión 3.x una automatización de blueprint por luz aplicaba los valores. El blueprint se ha eliminado:
 
-```
-Instancia "Oficina" (horario compartido)
-    ├── light.oficina_techo      →  switch.keyframe_oficina_oficina_techo_follow
-    ├── light.oficina_escritorio →  switch.keyframe_oficina_oficina_escritorio_follow
-    └── light.oficina_pared      →  switch.keyframe_oficina_oficina_pared_follow
-```
+1. **Eliminar** las automatizaciones de blueprint existentes — si no, dos sitios controlan la misma luz.
+2. Las antiguas «Follow Lights» se adoptan automáticamente como luces (con el tipo correspondiente al antiguo límite de hardware). Revísalas en **Configurar** y asigna el tipo de cada luz.
 
 ---
 
 ## Webapp
 
-Tras la instalación, **Keyframe Scheduler** aparece como entrada en la barra lateral de Home Assistant. La webapp permite diseñar horarios visualmente y exportarlos como JSON, PDF o CSV.
-
-URL directa: `http://<tu-host-ha>/keyframe_scheduler/index.html`
+Tras la instalación aparece **Keyframe Scheduler** como entrada en la barra lateral de Home Assistant. URL directa: `http://<tu-host-ha>/keyframe_scheduler/index.html`
 
 Idiomas disponibles: DE / EN / ES
 
@@ -151,7 +153,7 @@ Idiomas disponibles: DE / EN / ES
 
 | Componente | Versión mínima |
 |------------|---------------|
-| Home Assistant | 2024.1.0 |
+| Home Assistant | 2024.7.0 |
 | PICOlightnode *(opcional)* | 2.0.18 |
 
 ---

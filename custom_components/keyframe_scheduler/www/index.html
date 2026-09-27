@@ -1265,9 +1265,9 @@ const translations = {
     // Workflow
     workflow_title: "Workflow für Home Assistant:",
     workflow_step1: "klicken → JSON-Datei herunterladen",
-    workflow_step2: "JSON-Datei hochladen → Senden",
-    workflow_step3: "<strong>Integration neu laden!</strong>",
-    workflow_step3_detail: "Menü → Integration neu laden",
+    workflow_configure: "Konfigurieren",
+    workflow_step2: "Dateiinhalt einfügen, Leuchten und ihre Typen wählen → Senden",
+    workflow_step3: "Die Leuchten übernehmen den Zeitplan sofort – kein Neuladen nötig.",
     
     // Chart
     chart_brightness: "Helligkeit %",
@@ -1494,9 +1494,9 @@ const translations = {
     // Workflow
     workflow_title: "Workflow for Home Assistant:",
     workflow_step1: "click → Download JSON file",
-    workflow_step2: "Upload JSON file → Send",
-    workflow_step3: "<strong>Reload Integration!</strong>",
-    workflow_step3_detail: "Menu → Reload Integration",
+    workflow_configure: "Configure",
+    workflow_step2: "Paste the file content, choose the lights and their types → Submit",
+    workflow_step3: "The lights pick up the schedule at once – no reload needed.",
     
     // Chart
     chart_brightness: "Brightness %",
@@ -1723,9 +1723,9 @@ const translations = {
     // Workflow
     workflow_title: "Flujo de Trabajo para Home Assistant:",
     workflow_step1: "hacer clic → Descargar archivo JSON",
-    workflow_step2: "Subir archivo JSON → Enviar",
-    workflow_step3: "<strong>¡Recargar Integración!</strong>",
-    workflow_step3_detail: "Menú → Recargar Integración",
+    workflow_configure: "Configurar",
+    workflow_step2: "Pegar el contenido del archivo, elegir las luces y sus tipos → Enviar",
+    workflow_step3: "Las luces adoptan el horario de inmediato – no hace falta recargar.",
     
     // Chart
     chart_brightness: "Brillo %",
@@ -1814,9 +1814,9 @@ const translations = {
       workflowBox.innerHTML = `
         <strong>${t('workflow_title')}</strong><br>
         1. <strong>"${t('save_file')}"</strong> ${t('workflow_step1')}<br>
-        2. In HA: <code>${t('settings')} → Keyframe Scheduler → Options</code><br>
+        2. In HA: <code>${t('settings')} → Keyframe Scheduler → ${t('workflow_configure')}</code><br>
         3. <strong>${t('workflow_step2')}</strong><br>
-        4. ${t('workflow_step3')} <code>⋮ ${t('workflow_step3_detail')}</code>
+        ${t('workflow_step3')}
       `;
     }
     

@@ -1,66 +1,47 @@
 # Keyframe Scheduler Development Instructions
 
 ## Project Type
-Home Assistant Custom Integration for time-based keyframe interpolation of light values (brightness, color temperature)
+Home Assistant custom integration plus a bundled webapp: time-based light
+control with keyframes (brightness, colour temperature), triggered by clock
+time or sun events.
 
-## Current Version
-v3.0.10 - PICO Context Detection in Blueprint v4.0
+## What the integration does
+- Resolves each day's keyframes (fixed times, sun events with offset and
+  not-before/not-after bounds, keyframe groups) and interpolates between them
+- **Controls the assigned lights itself** (like Adaptive Lighting) — there is
+  no blueprint any more
+- Publishes the target values as sensors (for display and custom automations)
 
-## What This Integration Does
-- Interpolates keyframe values over time (brightness, color temp)
-- Provides sensor entities with current interpolated values
-- Works with ALL light types (Hue, WLED, **PICOlightnode**, Zigbee, DMX, etc.)
-- Blueprint applies sensor values to lights with smart manual override detection
+## Key principles
 
-## Development Focus
-- Universal compatibility (not PICO-specific!)
-- Keyframe interpolation accuracy
-- Blueprint context-aware manual override detection
-- Smooth transitions between keyframes
-- Robust sensor state management
+### 1. One instance = one schedule, many lights
+Lights of different buses (DALI, Zigbee, Casambi, ...) share one instance;
+each light has a type that limits fade length and command rate.
 
-## Key Principles
+### 2. Never switch a light on
+Only lights that are ON and follow the schedule get commands. Turning a light
+on (app, wall switch, presence) applies the current values at once.
 
-### 1. Integration is Data Provider Only
-```python
-# The integration DOES:
-✅ Interpolate keyframe values based on time
-✅ Provide sensor with brightness_01, temperature_k, transition_seconds
-✅ Handle keyframe configuration via UI
+### 3. Respect manual changes
+A change made by someone else pauses the light (its follow switch turns off).
+Off/on always resumes; optionally after N minutes or at the next keyframe.
+PICOlightnode internal updates (context id contains `picolightnode`) and the
+integration's own commands are never manual changes.
 
-# The integration DOES NOT:
-❌ Send values to lights directly
-❌ Know about specific light types
-❌ Control MQTT or other protocols
-```
+### 4. Webapp simulation and integration compute the same thing
+Sun model, daily resolution, group rules and evaluation exist twice — in
+JavaScript (`www/js/astro.js`, `www/index.html`) and in Python (`astro.py`,
+`scheduler.py`). Change both together and keep the reference values in the
+tests identical.
 
-### 2. Blueprint Applies Values
-- Blueprint reads sensor attributes
-- Blueprint sends to lights via `light.turn_on` service
-- Blueprint handles manual override detection
+## Code style
+- Type hints, small functions, comments that explain *why*
+- HA-independent logic in plain modules (`astro.py`, `scheduler.py`,
+  `light_logic.py`) so it can be unit-tested without Home Assistant
+- Webapp: LKL UI style guide tokens only (`--lkl-*`), no colour literals in
+  component CSS
 
-### 3. Context-Aware Detection (v4.0+)
-Blueprint must distinguish:
-- ✅ User actions (disable Follow External)
-- ❌ Automation/Integration updates (keep Follow External)
-
-## Code Style
-- Type hints everywhere
-- Clean sensor attribute updates
-- Efficient interpolation algorithms
-- Handle edge cases (midnight rollover, missing keyframes)
-- Comprehensive logging for debugging
-
-## Testing Requirements
-Before any commit:
-1. Test keyframe interpolation (verify values at different times)
-2. Test midnight rollover (23:59 → 00:01)
-3. Test Blueprint manual override detection
-4. Verify sensor attributes are correct
-5. Test with multiple sensor instances
-
-## Integration with PICOlightnode
-When working on PICO-related features:
-- PICOlightnode sends Context(id="picolightnode_restore") for internal updates
-- Blueprint v4.0 must detect this context and NOT treat as manual override
-- See blueprint detection logic in rules.md
+## Before any commit
+1. `python -m unittest discover -s tests` (no Home Assistant needed)
+2. Webapp: load `www/index.html` and check the console for errors
+3. Midnight and DST: covered by tests — add a case when touching the logic
