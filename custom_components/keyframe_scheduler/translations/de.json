@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Keyframe Scheduler einrichten",
-        "description": "Neue Keyframe Scheduler Instanz erstellen",
+        "description": "Neue Keyframe Scheduler Instanz erstellen – eine Instanz ist ein Zeitplan für beliebig viele Leuchten.",
         "data": {
           "name": "Instanzname"
         }
@@ -13,13 +13,39 @@
   "options": {
     "step": {
       "init": {
-        "title": "Zeitplan & Hardware konfigurieren",
-        "description": "📁 Ablauf:\n1. In der Webapp: '⬇️ Als Datei speichern' klicken\n2. Datei mit Texteditor öffnen (Notepad, TextEdit, etc.)\n3. Inhalt kopieren (Strg+A, Strg+C)\n4. Hier einfügen (Strg+V)\n\n⚙️ Hardware-Typ: Bestimmt die maximale Übergangszeit für deine Lampen",
+        "title": "Zeitplan & Leuchten",
+        "description": "Zeitplan: In der Webapp '⬇️ Als Datei speichern', Datei in einem Texteditor öffnen, Inhalt hier einfügen.\n\nLeuchten: Die Integration steuert die gewählten Leuchten selbst – nur wenn sie eingeschaltet sind, sie schaltet nie ein. Beim Einschalten übernehmen sie sofort den aktuellen Wert.\n\nManuelle Änderung (App, Szene, Taster): Die Leuchte pausiert. Aus- und wieder Einschalten setzt sie immer zurück.",
         "data": {
-          "schedule_json": "Zeitplan-JSON einfügen",
-          "hardware_type": "Hardware-Typ",
-          "custom_max_transition": "Benutzerdefinierte max. Übergangszeit (Sekunden)",
-          "follow_lights": "Zu folgende Lichter"
+          "schedule_json": "Zeitplan-JSON einfügen (leer = unverändert)",
+          "lights": "Leuchten (auch Gruppen)",
+          "resume_mode": "Nach manueller Änderung wieder folgen",
+          "resume_minutes": "Minuten bis zum Fortsetzen (bei „nach Minuten“)",
+          "detect_non_ha_changes": "Auch Änderungen am Gerät erkennen (z. B. Wand-Dimmer am Bus)",
+          "adjust_types": "Zeiten der Leuchtentypen anpassen"
+        }
+      },
+      "light_types": {
+        "title": "Leuchtentypen",
+        "description": "Der Typ bestimmt, wie lang ein Übergang höchstens sein darf und wie oft Befehle gesendet werden. Gruppen: der Typ gilt für alle Mitglieder."
+      },
+      "type_params": {
+        "title": "Zeiten der Leuchtentypen",
+        "description": "Max. Übergang = längster Fade pro Befehl. Min. Abstand = kürzeste Zeit zwischen zwei Befehlen an dieselbe Leuchte. Die Vorgaben sind vorsichtig gewählt – bitte an die Installation anpassen.",
+        "data": {
+          "dali_max_transition": "DALI: max. Übergang",
+          "dali_min_interval": "DALI: min. Abstand zwischen Befehlen",
+          "dali2_extended_max_transition": "DALI-2 Extended Fade: max. Übergang",
+          "dali2_extended_min_interval": "DALI-2 Extended Fade: min. Abstand zwischen Befehlen",
+          "casambi_max_transition": "Casambi / Bluetooth Mesh: max. Übergang",
+          "casambi_min_interval": "Casambi / Bluetooth Mesh: min. Abstand zwischen Befehlen",
+          "zigbee_max_transition": "Zigbee: max. Übergang",
+          "zigbee_min_interval": "Zigbee: min. Abstand zwischen Befehlen",
+          "hue_max_transition": "Philips Hue: max. Übergang",
+          "hue_min_interval": "Philips Hue: min. Abstand zwischen Befehlen",
+          "zwave_max_transition": "Z-Wave: max. Übergang",
+          "zwave_min_interval": "Z-Wave: min. Abstand zwischen Befehlen",
+          "generic_max_transition": "Generic / WLAN: max. Übergang",
+          "generic_min_interval": "Generic / WLAN: min. Abstand zwischen Befehlen"
         }
       }
     },
@@ -27,6 +53,26 @@
       "invalid_json": "Ungültiges JSON-Format — Dateiinhalt prüfen",
       "invalid_schedule": "Ungültige Zeitplandaten — Keyframes prüfen",
       "invalid_file": "Datei konnte nicht gelesen werden — manuelles Einfügen versuchen"
+    }
+  },
+  "selector": {
+    "light_type": {
+      "options": {
+        "dali": "DALI (max. 90 s)",
+        "dali2_extended": "DALI-2 Extended Fade (max. 27 min)",
+        "casambi": "Casambi / Bluetooth Mesh (max. 10 min)",
+        "zigbee": "Zigbee (max. 10 min)",
+        "hue": "Philips Hue (max. 10 min)",
+        "zwave": "Z-Wave (max. 5 min)",
+        "generic": "Generic / WLAN (max. 5 min)"
+      }
+    },
+    "resume_mode": {
+      "options": {
+        "never": "Nur durch Aus/Ein oder den Folgen-Schalter",
+        "minutes": "Nach einer Anzahl Minuten",
+        "next_keyframe": "Beim nächsten Keyframe"
+      }
     }
   }
 }

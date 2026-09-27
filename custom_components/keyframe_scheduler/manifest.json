@@ -10,6 +10,7 @@
   "requirements": [],
   "dependencies": [],
   "platforms": [
-    "sensor"
+    "sensor",
+    "switch"
   ]
 }

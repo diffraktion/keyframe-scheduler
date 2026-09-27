@@ -10,7 +10,6 @@ Run from the repository root:
 import asyncio
 import os
 import sys
-import types
 import unittest
 from datetime import datetime, timedelta
 
@@ -22,40 +21,7 @@ except ImportError:  # pragma: no cover
 BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
 
-def _install_homeassistant_stubs():
-    """Just enough of homeassistant.* for `import keyframe_scheduler`."""
-    def module(name, **attrs):
-        mod = types.ModuleType(name)
-        mod.__dict__.update(attrs)
-        sys.modules[name] = mod
-        return mod
-
-    class DataUpdateCoordinator:
-        def __init__(self, hass, logger, name=None, **_):
-            self.hass, self.name = hass, name
-
-    class Platform:
-        SENSOR = "sensor"
-        SWITCH = "switch"
-
-    module("homeassistant")
-    module("homeassistant.components")
-    module("homeassistant.components.frontend")
-    module("homeassistant.components.http", StaticPathConfig=object)
-    module("homeassistant.config_entries", ConfigEntry=object)
-    module("homeassistant.const", Platform=Platform)
-    module("homeassistant.core", HomeAssistant=object, ServiceCall=object, callback=lambda f: f)
-    module("homeassistant.helpers")
-    module("homeassistant.helpers.event", async_track_point_in_time=None)
-    module("homeassistant.helpers.storage", Store=object)
-    module("homeassistant.helpers.update_coordinator", DataUpdateCoordinator=DataUpdateCoordinator)
-    module("homeassistant.util")
-    module("homeassistant.util.dt", now=lambda: datetime.now(BERLIN_TZ))
-    sys.modules["homeassistant.util"].dt = sys.modules["homeassistant.util.dt"]
-
-
-_install_homeassistant_stubs()
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "custom_components"))
+import ha_stubs  # noqa: E402,F401  (installs the Home Assistant stand-ins)
 
 from keyframe_scheduler import HybridSchedulerCoordinator  # noqa: E402
 from keyframe_scheduler.scheduler import Evaluator, spec_from_dict  # noqa: E402
@@ -135,6 +101,8 @@ class UpdateDataTest(unittest.TestCase):
             kf("20:00", 2700, 30, "instant", trigger="sun", sunEvent="sunset", offsetMinutes=30),
         ])
         import keyframe_scheduler
+        original_now = keyframe_scheduler.dt_util.now
+        self.addCleanup(setattr, keyframe_scheduler.dt_util, "now", original_now)  # shared stub module
         keyframe_scheduler.dt_util.now = lambda: at(2026, 6, 21, 21, 0)
         data = asyncio.run(c._async_update_data())
         self.assertEqual(data["brightness"], 100.0)  # before 22:03
