@@ -35,7 +35,7 @@
 #### Changed
 - Web app restyled on the LKL UI style guide 1.0.0 (`www/styleguide/`): design tokens, glass/paper skins, day/night/auto theme with switcher in the header
 - Chart colours follow the active theme; PDF export always renders the chart on white
-- Keyframe table: brightness before colour temperature (also in the PDF); handle, number, group and trigger aligned to the top of the row, value columns centred
+- Keyframe table: brightness before colour temperature (also in the PDF); all columns aligned to the first line of the row
 - Day chart: colour temperature on a real Kelvin axis spanning the schedule's own range (was normalised 2000–6500 K → 0–100); summary tiles below the chart removed
 
 #### Removed

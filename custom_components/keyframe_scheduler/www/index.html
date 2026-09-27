@@ -106,11 +106,10 @@
     .lkl-banner .lkl-pill { margin: 2px var(--lkl-space-1) 2px 0; }
 
     /* ---- Keyframe table ------------------------------------------------------ */
-    .keyframes-table td { vertical-align: middle; }
-    /* Handle, number, group and trigger sit on the row's first line; the
-       value columns stay centred. .cell-line gives plain text the height of
-       a form control so it lines up with the selects next to it. */
-    .keyframes-table td.is-top { vertical-align: top; }
+    /* Every column sits on the row's first line (sun keyframes have extra
+       lines in the trigger column). .cell-line gives plain text the height
+       of a form control so it lines up with the fields next to it. */
+    .keyframes-table td { vertical-align: top; }
     .keyframes-table .cell-line {
       display: flex;
       align-items: center;
@@ -2413,15 +2412,15 @@ const translations = {
         
         html += `
           <tr draggable="true" data-index="${index}">
-            <td class="is-top"><span class="cell-line drag-handle">⋮⋮</span></td>
-            <td class="is-top"><span class="cell-line row-number">${index + 1}</span></td>
-            <td class="is-top">
+            <td><span class="cell-line drag-handle">⋮⋮</span></td>
+            <td><span class="cell-line row-number">${index + 1}</span></td>
+            <td>
               <select class="lkl-select group-select" title="${t('group_title')}" onchange="updateKeyframe(${index}, 'group', this.value)">
                 <option value="" ${kf.group ? '' : 'selected'}>–</option>
                 ${GROUP_IDS.map(id => `<option value="${id}" ${kf.group === id ? 'selected' : ''}>${id}</option>`).join('')}
               </select>
             </td>
-            <td class="is-top trigger-td">${renderTriggerCell(kf, index)}</td>
+            <td class="trigger-td">${renderTriggerCell(kf, index)}</td>
             <td>
               <input class="lkl-input" type="number" min="0" max="100" step="5"
                      value="${kf.dim}"
