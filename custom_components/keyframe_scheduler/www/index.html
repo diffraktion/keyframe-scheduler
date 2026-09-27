@@ -878,11 +878,6 @@
       return list;
     }
 
-    /** True if the keyframe fires on dateStr after group rules. */
-    function firesOn(kf, dateStr) {
-      return resolveKeyframes(dateStr).some(r => r.id === kf.id);
-    }
-
     let conflictCache = null;
 
     /**
@@ -1121,8 +1116,6 @@ const translations = {
     trigger_sun: "Sonne",
     not_before: "frühestens",
     not_after: "spätestens",
-    event_skipped: "entfällt",
-    resolved_on: "am gewählten Tag",
     sun_astronomical_dawn: "Astron. Morgendämmerung",
     sun_nautical_dawn: "Naut. Morgendämmerung",
     sun_civil_dawn: "Bürgerl. Morgendämmerung",
@@ -1167,7 +1160,6 @@ const translations = {
     overlap_action: "Gruppe bilden",
     overlap_pill: "Überlappung",
     legend_overlap: "Konflikt (nicht gruppiert)",
-    skipped_by_rule: "entfällt (Gruppe)",
     
     // Card titles
     settings: "Einstellungen",
@@ -1231,7 +1223,7 @@ const translations = {
     bounds_reason_impossible: "Zwischen {prev} und {next} bleibt übers Jahr kein Zeitfenster frei – hier ist eine Gruppe die bessere Lösung.",
     bounds_apply: "Empfehlung übernehmen",
     offset_label: "Versatz",
-    offset_help_intro: "Versatz zum Sonnenereignis in Minuten: positiv = später, negativ = früher (bis ±12 h). Die Kapsel daneben zeigt die Uhrzeit am gewählten Tag – Grenzen schon eingerechnet.",
+    offset_help_intro: "Versatz zum Sonnenereignis in Minuten: positiv = später, negativ = früher (bis ±12 h).",
     offset_help_calc: "Am {date}: {event} {eventTime} {offset} = {result}",
     offset_help_raised: "Durch „frühestens“ auf {t} angehoben.",
     offset_help_lowered: "Durch „spätestens“ auf {t} begrenzt.",
@@ -1353,8 +1345,6 @@ const translations = {
     trigger_sun: "Sun",
     not_before: "not before",
     not_after: "not after",
-    event_skipped: "skipped",
-    resolved_on: "on the selected day",
     sun_astronomical_dawn: "Astronomical dawn",
     sun_nautical_dawn: "Nautical dawn",
     sun_civil_dawn: "Civil dawn",
@@ -1399,7 +1389,6 @@ const translations = {
     overlap_action: "Create group",
     overlap_pill: "Overlap",
     legend_overlap: "Conflict (not grouped)",
-    skipped_by_rule: "skipped (group)",
     
     // Card titles
     settings: "Settings",
@@ -1463,7 +1452,7 @@ const translations = {
     bounds_reason_impossible: "No window is left between {prev} and {next} over the year – a group is the better solution here.",
     bounds_apply: "Apply recommendation",
     offset_label: "Offset",
-    offset_help_intro: "Offset to the sun event in minutes: positive = later, negative = earlier (up to ±12 h). The pill next to it shows the time on the selected day – bounds already applied.",
+    offset_help_intro: "Offset to the sun event in minutes: positive = later, negative = earlier (up to ±12 h).",
     offset_help_calc: "On {date}: {event} {eventTime} {offset} = {result}",
     offset_help_raised: "Raised to {t} by \"not before\".",
     offset_help_lowered: "Limited to {t} by \"not after\".",
@@ -1585,8 +1574,6 @@ const translations = {
     trigger_sun: "Sol",
     not_before: "no antes de",
     not_after: "no después de",
-    event_skipped: "omitido",
-    resolved_on: "en el día seleccionado",
     sun_astronomical_dawn: "Alba astronómica",
     sun_nautical_dawn: "Alba náutica",
     sun_civil_dawn: "Alba civil",
@@ -1631,7 +1618,6 @@ const translations = {
     overlap_action: "Crear grupo",
     overlap_pill: "Solapamiento",
     legend_overlap: "Conflicto (sin agrupar)",
-    skipped_by_rule: "omitido (grupo)",
     
     // Card titles
     settings: "Configuración",
@@ -1695,7 +1681,7 @@ const translations = {
     bounds_reason_impossible: "No queda ventana entre {prev} y {next} a lo largo del año – aquí es mejor crear un grupo.",
     bounds_apply: "Aplicar recomendación",
     offset_label: "Desfase",
-    offset_help_intro: "Desfase respecto al evento solar en minutos: positivo = más tarde, negativo = antes (hasta ±12 h). La etiqueta de al lado muestra la hora en el día seleccionado – con los límites ya aplicados.",
+    offset_help_intro: "Desfase respecto al evento solar en minutos: positivo = más tarde, negativo = antes (hasta ±12 h).",
     offset_help_calc: "El {date}: {event} {eventTime} {offset} = {result}",
     offset_help_raised: "Adelantado a {t} por „no antes de“.",
     offset_help_lowered: "Limitado a {t} por „no después de“.",
@@ -2240,28 +2226,20 @@ const translations = {
           <option value="sun" ${kf.trigger === 'sun' ? 'selected' : ''}>${t('trigger_sun')}</option>
         </select>`;
 
-      const resolved = resolveKeyframeMinutes(kf, viewDate);
-      const skippedByRule = resolved != null && !firesOn(kf, viewDate);
-      const rulePill = `<span class="lkl-pill is-warn" title="${t('resolved_on')}">${t('skipped_by_rule')}</span>`;
-
+      // Settings only — when a keyframe fires on a given day is shown in the
+      // day and year views (and in the offset's hover help).
       if (kf.trigger !== 'sun') {
         return `
           <div class="trigger">
             ${triggerSelect}
             <input class="lkl-input" type="time" value="${kf.time}"
                    oninput="updateKeyframe(${index}, 'time', this.value)">
-            ${skippedByRule ? rulePill : ''}
           </div>`;
       }
 
       const eventOptions = KfAstro.EVENT_NAMES.map(name =>
         `<option value="${name}" ${kf.sunEvent === name ? 'selected' : ''}>${t('sun_' + name)}</option>`
       ).join('');
-
-      const resolvedPill = resolved == null
-        ? `<span class="lkl-pill is-warn" title="${t('resolved_on')}">${t('event_skipped')}</span>`
-        : skippedByRule ? rulePill
-        : `<span class="lkl-pill is-accent" title="${t('resolved_on')}">${formatDate(viewDate, { day: '2-digit', month: '2-digit' })} → <span class="lkl-mono">${formatTime(resolved)}</span></span>`;
 
       return `
         <div class="trigger">
@@ -2276,7 +2254,6 @@ const translations = {
                  value="${kf.offsetMinutes || 0}"
                  onchange="updateKeyframe(${index}, 'offsetMinutes', this.value)">
           <span class="trigger-label">min</span>
-          ${resolvedPill}
         </div>
         <div class="trigger bounds-row" data-index="${index}">
           <span class="trigger-label is-lead">${t('not_before')}</span>
@@ -2883,28 +2860,40 @@ const translations = {
     /** Chart.js plugin: shades night and twilight behind the curves, from the
         actual sun altitude of each sample (full shade below -12°). */
     /** Chart.js plugin: red dashed markers at keyframes that overlap on a day. */
-    const overlapMarksPlugin = {
-      id: 'overlapMarks',
-      afterDatasetsDraw(c, args, opts) {
+    /** Chart.js plugin: a thin vertical line with "#n" where each keyframe
+        fires; overlapping keyframes in red. Labels of keyframes that sit
+        close together are stacked in up to three rows. */
+    const keyframeMarksPlugin = {
+      id: 'keyframeMarks',
+      beforeDatasetsDraw(c, args, opts) {
         if (!opts || !opts.marks || !opts.marks.length) return;
         const { ctx, chartArea: area, scales: { x } } = c;
+        const rowHeight = 11, rows = 3, minGap = 18;
+        const lastX = new Array(rows).fill(-Infinity);
         ctx.save();
-        ctx.strokeStyle = opts.color;
-        ctx.fillStyle = opts.color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
         ctx.font = `600 10px ${opts.font}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        opts.marks.forEach(m => {
-          const px = x.getPixelForValue(m.index);
-          if (px < area.left || px > area.right) return;
-          ctx.beginPath();
-          ctx.moveTo(px, area.top + 12);
-          ctx.lineTo(px, area.bottom);
-          ctx.stroke();
-          ctx.fillText(m.label, px, area.top);
-        });
+        opts.marks
+          .map(m => ({ ...m, px: x.getPixelForValue(m.index) }))
+          .filter(m => m.px >= area.left && m.px <= area.right)
+          .sort((a, b) => a.px - b.px)
+          .forEach(m => {
+            let row = lastX.findIndex(last => m.px - last >= minGap);
+            if (row < 0) row = rows - 1;
+            lastX[row] = m.px;
+            // Labels live in the chart's top padding, row 0 closest to the plot
+            const labelTop = area.top - (row + 1) * rowHeight - 2;
+            ctx.strokeStyle = m.overlap ? opts.overlapColor : opts.lineColor;
+            ctx.lineWidth = m.overlap ? 1.5 : 1;
+            ctx.setLineDash(m.overlap ? [4, 3] : [2, 3]);
+            ctx.beginPath();
+            ctx.moveTo(m.px, labelTop + rowHeight);
+            ctx.lineTo(m.px, area.bottom);
+            ctx.stroke();
+            ctx.fillStyle = m.overlap ? opts.overlapColor : opts.labelColor;
+            ctx.fillText(m.label, m.px, labelTop);
+          });
         ctx.restore();
       }
     };
@@ -2981,12 +2970,19 @@ const translations = {
         max: Math.ceil((kelvinMax + kelvinPad) / 100) * 100
       };
 
-      // Overlap markers for every day of the horizon (sample index = minutes / step)
-      const overlapMarks = [];
+      // Keyframe markers for every day of the horizon (sample index = minutes
+      // / step); keyframes in an unresolved overlap that day are marked red.
+      const keyframeMarks = [];
       for (let day = 0; day * 1440 < horizonMinutes; day++) {
-        overlapsOn(addDays(viewDate, day)).forEach(o => {
-          overlapMarks.push({ index: (day * 1440 + o.mEarly) / chartStepMinutes, label: `#${o.pair.early + 1}` });
-          overlapMarks.push({ index: (day * 1440 + o.mLate) / chartStepMinutes, label: `#${o.pair.late + 1}` });
+        const date = addDays(viewDate, day);
+        const overlapping = new Set();
+        overlapsOn(date).forEach(o => { overlapping.add(o.pair.early); overlapping.add(o.pair.late); });
+        resolveKeyframes(date).forEach(k => {
+          keyframeMarks.push({
+            index: (day * 1440 + parseTime(k.time)) / chartStepMinutes,
+            label: `#${k.sourceIndex + 1}`,
+            overlap: overlapping.has(k.sourceIndex)
+          });
         });
       }
 
@@ -3002,7 +2998,7 @@ const translations = {
 
       chart = new Chart(ctx, {
         type: 'line',
-        plugins: [sunBandsPlugin, overlapMarksPlugin],
+        plugins: [sunBandsPlugin, keyframeMarksPlugin],
         data: {
           labels,
           datasets: [
@@ -3037,6 +3033,8 @@ const translations = {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          // Room above the plot for the keyframe labels (see keyframeMarksPlugin)
+          layout: { padding: { top: 38 } },
           animation: options.animation === false ? false : undefined,
           color: palette.text,
           font: { family: palette.font },
@@ -3046,9 +3044,12 @@ const translations = {
           },
           plugins: {
             sunBands: { samples: timeData, color: palette.nightShade, alpha: palette.nightAlpha },
-            overlapMarks: { marks: overlapMarks, color: palette.danger, font: palette.fontMono },
+            keyframeMarks: {
+              marks: keyframeMarks, font: palette.fontMono,
+              lineColor: palette.grid, labelColor: palette.tick, overlapColor: palette.danger
+            },
             legend: {
-              position: 'top',
+              position: 'bottom',   // the top edge carries the keyframe labels
               labels: { color: palette.text, font: { family: palette.font }, boxHeight: 2 }
             },
             tooltip: {

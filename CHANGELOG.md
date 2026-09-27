@@ -16,7 +16,8 @@
 - Web app: ungrouped conflicts are marked red on the days of the less frequent order — strip and traces in the year view, markers and notice in the day view, notice with "create group" above the year view
 - Web app: hints for setups that silently change the curve over the year — groups mixing modes, interpolate keyframes whose predecessor changes with the day (unless an open conflict already explains it), and interpolations running across midnight
 - Web app: hover help on the not-before / not-after bounds of sun keyframes — the keyframe's range over the year, days without the event, and a one-click recommendation derived day by day from the other keyframes (so it never overtakes a neighbour) plus a stand-in time for days without the event
-- Web app: sun keyframes show a labelled offset ("Versatz … min") with hover help that works out the viewed day's time, and the resolved time with its date ("27.09. → 07:30")
+- Web app: sun keyframes show a labelled offset ("Versatz … min") with hover help that works out the viewed day's time; the table shows settings only — firing times are shown in the views
+- Web app: day chart marks when each keyframe fires ("#n" above the plot, red for overlaps); legend moved below the chart
 - Web app: three selectable examples — LKL office profile "Büroprofil Lichtdusche" (local time, two light showers), sun only, mixed (with conflicts in Berlin); loading an example also sets the schedule name
 - Export: keyframe `id` and `group`, plus a `groups` array with each group's rule
 - Export: `location` block and `trigger`/`sunEvent`/`offsetMinutes`/`notBefore`/`notAfter` per keyframe; `time` carries today's resolved time as fallback for older integration versions
