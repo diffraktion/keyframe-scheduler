@@ -151,7 +151,7 @@ Verfügbare Sprachen: DE / EN / ES
 
 **PICO DailyScheduler** (Export & Import) erzeugt das `DAILYSCHEDULER`-Behavior für das `setup.json` eines PICO lightnode: in die `behaviors` eines Targets mit Space `TC` einfügen. Targets, Adjust-/Override-Behaviors und Destinations bleiben im Setup; Koordinaten und Zeitzone kommen aus der PICO-Konfiguration (`pico.latitude` / `pico.longitude`).
 
-Ein Eintrag pro Keyframe hält die Datei klein: Sonnen-Trigger, Versatz, Früh-/Spätgrenzen und Gruppen (`EARLIEST`/`LATEST`) werden 1:1 übersetzt. Der PICO blendet nur linear und mit fester Dauer – Sinus-Kurven werden linear, und eine an die Sonne gebundene Interpolation nutzt die kürzeste Rampe des Jahres (das Ziel wird früher erreicht und gehalten). Die Exportansicht listet jede Abweichung zur Simulation.
+Sonnen-Trigger, Versatz, Früh-/Spätgrenzen und Gruppen (`EARLIEST`/`LATEST`) werden 1:1 übersetzt. Ausgang **DALI** (Standard) hält jeden Fade bei höchstens 15 min: längere Fades werden in ganze Minuten zerlegt, die der Kurve des Keyframes folgen (die Datei wird dadurch größer). Ausgang **DMX / andere** schreibt einen Eintrag pro Keyframe. Der PICO blendet nur linear und mit fester Dauer – Sinus-Kurven werden linear, und eine an die Sonne gebundene Interpolation nutzt die kürzeste Rampe des Jahres (das Ziel wird früher erreicht und gehalten). Die Exportansicht listet jede Abweichung zur Simulation.
 
 ---
 

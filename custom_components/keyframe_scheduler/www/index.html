@@ -574,6 +574,13 @@
 
       <details id="picoDetails">
         <summary id="pico-summary">PICO-DailyScheduler anzeigen</summary>
+        <div class="btn-row spaced">
+          <label class="control-group-label" for="picoBus" id="pico-bus-label">Ausgang</label>
+          <select class="lkl-select" id="picoBus">
+            <option value="dali" id="opt-pico-dali">DALI – Fades bis 15 min</option>
+            <option value="free" id="opt-pico-free">DMX / andere – Fades ohne Grenze</option>
+          </select>
+        </div>
         <div id="picoNotes"></div>
         <textarea id="picoOutput" class="lkl-code json-box" readonly></textarea>
       </details>
@@ -722,6 +729,7 @@
       horizonHours: 48,
       location: null,   // { lat, lon, tz } — null until set, see getLocation()
       groupRules: {},     // { A: "earliest" | "latest" | "all" }, see listGroups()
+      picoBus: 'dali',     // PICO export: 'dali' (fades split at 15 min) or 'free'
       keyframes: []
     };
 
@@ -1253,6 +1261,9 @@ const translations = {
     pico_warn_substitute: "{k}: „{event}“ kennt der PICO nicht – exportiert als „{base}“ {offset} (Abweichung bis {dev} min).",
     pico_warn_group: "{g}: Die Mitglieder beginnen unterschiedlich früh (Transition davor / Interpolation). Der PICO vergleicht die Startzeiten, nicht die Keyframe-Zeiten – der Gewinner kann abweichen.",
     pico_warn_order: "Die Reihenfolge der Einträge wechselt an {n} Tagen ({ranges}). Der PICO verlangt pro Tag eine chronologische Reihenfolge – Konflikte gruppieren.",
+    pico_bus: "Ausgang",
+    pico_bus_dali: "DALI – Fades bis 15 min",
+    pico_bus_free: "DMX / andere – Fades ohne Grenze",
     days_short: "Tage",
     
     // Modes
@@ -1494,6 +1505,9 @@ const translations = {
     pico_warn_substitute: "{k}: the PICO has no \"{event}\" – exported as \"{base}\" {offset} (up to {dev} min off).",
     pico_warn_group: "{g}: the members start at different lead times (transition before / interpolation). The PICO compares start times, not keyframe times – the winner may differ.",
     pico_warn_order: "The order of the entries changes on {n} days ({ranges}). The PICO needs each day's entries in chronological order – group the conflicts.",
+    pico_bus: "Output",
+    pico_bus_dali: "DALI – fades up to 15 min",
+    pico_bus_free: "DMX / other – unlimited fades",
     days_short: "days",
     
     // Modes
@@ -1735,6 +1749,9 @@ const translations = {
     pico_warn_substitute: "{k}: el PICO no conoce «{event}» – se exporta como «{base}» {offset} (desviación hasta {dev} min).",
     pico_warn_group: "{g}: los miembros empiezan con distinta antelación (transición antes / interpolación). El PICO compara las horas de inicio, no las de los keyframes – el ganador puede variar.",
     pico_warn_order: "El orden de las entradas cambia durante {n} días ({ranges}). El PICO necesita las entradas de cada día en orden cronológico – agrupa los conflictos.",
+    pico_bus: "Salida",
+    pico_bus_dali: "DALI – fundidos hasta 15 min",
+    pico_bus_free: "DMX / otros – fundidos sin límite",
     days_short: "días",
     
     // Modes
@@ -1976,6 +1993,9 @@ const translations = {
       document.getElementById('downloadPdfBtn').textContent = t('pdf_export');
       document.getElementById('downloadPicoBtn').textContent = t('pico_export');
       document.getElementById('pico-summary').textContent = t('pico_summary');
+      document.getElementById('pico-bus-label').textContent = t('pico_bus');
+      document.getElementById('opt-pico-dali').textContent = t('pico_bus_dali');
+      document.getElementById('opt-pico-free').textContent = t('pico_bus_free');
       renderPico();
       document.getElementById('downloadCsvBtn').textContent = t('csv_export');
     }
@@ -4061,8 +4081,8 @@ const translations = {
     // the setup and are not touched.
     //
     // A PICO entry fires at its time and fades LINEARLY to its point within
-    // `fade` seconds. One entry per keyframe keeps the file small (the ESP32
-    // handles large files badly, and DALI must not be flooded with steps):
+    // `fade` seconds. As few entries as possible keep the file small (the
+    // ESP32 handles large files badly, and DALI must not be flooded):
     //   instant            at the keyframe, fade 0
     //   transition after   at the keyframe, fade = transition
     //   transition before  at keyframe − transition, fade = transition
@@ -4072,6 +4092,8 @@ const translations = {
     //                      early and held. After an instant predecessor the
     //                      simulation does not ramp (evaluateSchedule), so the
     //                      keyframe is exported like an instant one.
+    // On DALI (state.picoBus) a fade longer than 15 min is split into pieces
+    // of whole minutes; the pieces end on the keyframe's curve (sine too).
     // Bounds and groups become EARLIEST/LATEST composites. Nesting the bounds
     // in the right order reproduces resolveKeyframeMinutes' fallback on days
     // without the event. Latitude, longitude and time zone come from the
@@ -4088,6 +4110,8 @@ const translations = {
       nautical_dusk: 'RELATIVETONAUTICALDUSK',
       astronomical_dusk: 'RELATIVETOASTRONOMICALDUSK'
     };
+    // Longest fade per PICO entry on DALI (extended fade time ends at 16 min)
+    const PICO_DALI_MAX_FADE = 900;
     // Events the PICO lacks → a supported event plus offset. Solar midnight is
     // noon − 12 h (astro.js); golden hour gets the year's mean distance.
     const PICO_SUBSTITUTES = {
@@ -4149,10 +4173,11 @@ const translations = {
         }
       });
 
-      // Ramp start of each interpolate keyframe: its predecessor per day and
-      // the ramp length (minutes), as in analyzeHints()
+      // Predecessor of every keyframe per day (the keyframe before it in the
+      // day's order) and, for interpolate keyframes, the ramp length in
+      // minutes — as in analyzeHints()
       const rampDelay = kf => (kf.mode === 'transition' && kf.transitionDirection !== 'before' ? kf.transitionSeconds / 60 : 0);
-      const ramps = {};   // k → { pred → { days, min, max } }
+      const preds = {};   // k → { pred → { days, min, max } }
       let previousLast = null;
       for (let d = -1; d < days; d++) {
         const list = resolveKeyframes(addDays(`${year}-01-01`, d))
@@ -4160,10 +4185,9 @@ const translations = {
           .sort((a, b) => a.m - b.m);
         if (d >= 0) {
           list.forEach((k, pos) => {
-            if (kfs[k.i].mode !== 'interpolate') return;
             const pred = pos > 0 ? list[pos - 1] : previousLast && { i: previousLast.i, m: previousLast.m - 1440 };
             if (!pred) return;
-            const byPred = ramps[k.i] = ramps[k.i] || {};
+            const byPred = preds[k.i] = preds[k.i] || {};
             const r = byPred[pred.i] = byPred[pred.i] || { days: 0, min: Infinity, max: -Infinity };
             const len = k.m - (pred.m + rampDelay(kfs[pred.i]));
             r.days++;
@@ -4180,15 +4204,17 @@ const translations = {
         return g && g.rule !== 'all' && g.members.length > 1 ? g : null;
       };
       const sameSlot = (a, b) => a === b || (groupOf(a) && groupOf(a) === groupOf(b));
+      const slotMembers = i => (groupOf(i) ? groupOf(i).members : [i]);
+      const ruleOf = i => (groupOf(i) ? groupOf(i).rule.toUpperCase() : null);
 
       // The most frequent predecessor is the one exported. Members of one
       // group count as the same predecessor — the composite picks the member.
       const mainPred = {};
-      Object.keys(ramps).forEach(k => {
-        const entries = Object.entries(ramps[k]).map(([p, r]) => ({ pred: +p, ...r })).sort((a, b) => b.days - a.days);
+      Object.keys(preds).forEach(k => {
+        const entries = Object.entries(preds[k]).map(([p, r]) => ({ pred: +p, ...r })).sort((a, b) => b.days - a.days);
         mainPred[k] = entries[0];
         const others = entries.filter(e => !sameSlot(e.pred, entries[0].pred)).reduce((n, e) => n + e.days, 0);
-        if (others) warnings.push({ type: 'pred', kf: +k, pred: entries[0].pred, days: others });
+        if (others && kfs[k].mode === 'interpolate') warnings.push({ type: 'pred', kf: +k, pred: entries[0].pred, days: others });
       });
       const ramping = i => {
         const p = mainPred[i];
@@ -4218,17 +4244,6 @@ const translations = {
         order.forEach(([type, bound]) => { if (bound) entry = { type, entries: [entry, bound] }; });
         return entry;
       };
-      // Keyframe i — or the member of its group that fires — shifted per member
-      const anchorEntry = (i, shiftFn, pointFn) => {
-        const g = groupOf(i);
-        if (!g) return timeEntry(i, shiftFn(i), pointFn(i));
-        return { type: g.rule.toUpperCase(), entries: g.members.map(m => timeEntry(m, shiftFn(m), pointFn(m))) };
-      };
-      const anchorTime = (i, d, shiftFn) => {
-        const g = groupOf(i);
-        const m = (g ? g.members : [i]).find(x => perDay[d][x] != null);
-        return m == null ? null : perDay[d][m] + shiftFn(m) / 60;
-      };
 
       // Where a ramp towards the next keyframe starts after keyframe m (+1 s
       // if m's own entry sits at the same instant — two entries must not tie)
@@ -4244,59 +4259,108 @@ const translations = {
         return kf.mode === 'transition' && kf.transitionDirection === 'before' ? -kf.transitionSeconds : 0;
       };
 
-      // Keyframe i's own entry: { json, timeOn(d), timeOnly }
-      const ownEntry = i => {
-        const kf = kfs[i];
+      // Fade limit per entry. DALI's extended fade time ends at 16 min; we
+      // keep to 15 min. The PICO rounds DALI fades with lround(t/unit + 0.5)
+      // (dalisink.cpp, extendedFadeForTime), so exactly 900 s would become
+      // 16 min — a fade of whole units is written a hair shorter.
+      const dali = state.picoBus !== 'free';
+      const busFade = s => {
+        if (s <= 0.05) return 0;
+        if (!dali) return Math.round(s);
+        const unit = s <= 1.65 ? 0.1 : s <= 16.5 ? 1 : s <= 165 ? 10 : 60;
+        return Math.round((s - 0.02 * unit) * 100) / 100;
+      };
+      // Split a fade into pieces the bus can take: [{ start, length }] in s.
+      // Pieces are whole minutes, so each one reaches the ballast exactly.
+      const segments = (seconds, count) => {
+        const n = count || (dali && seconds > PICO_DALI_MAX_FADE ? Math.ceil(seconds / PICO_DALI_MAX_FADE) : 1);
+        if (seconds <= 0) return Array.from({ length: n }, () => ({ start: 0, length: 0 }));
+        if (n === 1) return [{ start: 0, length: seconds }];
+        const minutes = Math.max(n, Math.floor(seconds / 60));
+        const q = Math.floor(minutes / n), r = minutes % n;
+        let start = 0;
+        return Array.from({ length: n }, (_, j) => {
+          const piece = { start, length: (q + (j < r ? 1 : 0)) * 60 };
+          start += piece.length;
+          return piece;
+        });
+      };
+
+      // A slot is what the PICO does for one keyframe: entries anchored at
+      // the keyframe itself, its group, or (for a ramp) its predecessor or
+      // the predecessor's group. Per anchoring member: start shift, fade
+      // length, start value.  { rule, members: [{ m, to, from, shift, seconds }] }
+      const valueOf = i => ({ dim: kfs[i].dim, kelvin: kfs[i].kelvin });
+      const fromOf = i => valueOf(mainPred[i] ? mainPred[i].pred : i);
+      const slotFor = i => {
         if (ramping(i)) {
           const p = mainPred[i];
           // Each member of the predecessor's group gets the ramp length of
           // the days it wins; the fade can only be fixed per member.
-          const rampOf = m => (ramps[i][m] && sameSlot(m, p.pred) ? ramps[i][m] : p);
-          const spread = [...new Set((groupOf(p.pred) ? groupOf(p.pred).members : [p.pred]).map(rampOf))]
+          const rampOf = m => (preds[i][m] && sameSlot(m, p.pred) ? preds[i][m] : p);
+          const spread = [...new Set(slotMembers(p.pred).map(rampOf))]
             .reduce((w, r) => (r.max - r.min > w.max - w.min ? r : w));
           if (spread.max - spread.min > 1) warnings.push({ type: 'fade', kf: i, min: spread.min, max: spread.max });
-          const pointFn = m => {
-            const fadeMin = Math.max(0, rampOf(m).min - rampShift(m) / 60 + rampDelay(kfs[m]));
-            return picoPoint(kf, fadeMin * 60);
-          };
           return {
-            json: anchorEntry(p.pred, rampShift, pointFn),
-            timeOn: d => anchorTime(p.pred, d, rampShift),
-            timeOnly: kfs[p.pred].trigger !== 'sun'
+            rule: ruleOf(p.pred),
+            members: slotMembers(p.pred).map(m => ({
+              m, to: i, from: valueOf(m), shift: rampShift(m),
+              seconds: Math.max(0, (rampOf(m).min + rampDelay(kfs[m])) * 60 - rampShift(m))
+            }))
           };
         }
-        const fade = kf.mode === 'transition' ? kf.transitionSeconds : 0;
+        // A group member that ramps cannot share the group's anchor — it is
+        // exported like an instant keyframe (reported as 'group' below)
         return {
-          json: timeEntry(i, ownShift(i), picoPoint(kf, fade)),
-          timeOn: d => (perDay[d][i] == null ? null : perDay[d][i] + ownShift(i) / 60),
-          timeOnly: kf.trigger !== 'sun'
+          rule: ruleOf(i),
+          members: slotMembers(i).map(m => ({
+            m, to: m, from: fromOf(m), shift: ownShift(m),
+            seconds: kfs[m].mode === 'transition' ? kfs[m].transitionSeconds : 0
+          }))
         };
       };
 
-      const linear = kfs.map((kf, i) => i).filter(i =>
-        kfs[i].curve === 'sinus' && (kfs[i].mode === 'transition' || ramping(i)));
-      if (linear.length) warnings.push({ type: 'linear', kfs: linear });
-
-      // One entry per keyframe; a group with a priority rule becomes one composite
       const entries = [];
+      const linear = new Set();
+      const emit = slot => {
+        const n = Math.max(...slot.members.map(x => segments(x.seconds).length));
+        const parts = slot.members.map(x => segments(x.seconds, n));
+        slot.members.forEach(x => {
+          if (n === 1 && x.seconds > 0 && kfs[x.to].curve === 'sinus') linear.add(x.to);
+        });
+        for (let j = 0; j < n; j++) {
+          // Piece j ends on the keyframe's curve (the last one on its target)
+          const point = (x, piece) => {
+            const kf = kfs[x.to];
+            const p = j === n - 1 || x.seconds <= 0 ? 1 : (piece.start + piece.length) / x.seconds;
+            const e = kf.curve === 'sinus' ? easeSinus(p) : p;
+            return picoPoint({ dim: lerp(x.from.dim, kf.dim, e), kelvin: lerp(x.from.kelvin, kf.kelvin, e) }, busFade(piece.length));
+          };
+          const jsons = slot.members.map((x, k) => timeEntry(x.m, x.shift + parts[k][j].start, point(x, parts[k][j])));
+          entries.push({
+            json: slot.rule ? { type: slot.rule, entries: jsons } : jsons[0],
+            timeOn: d => {
+              const k = slot.members.findIndex(x => perDay[d][x.m] != null);
+              return k < 0 ? null : perDay[d][slot.members[k].m] + (slot.members[k].shift + parts[k][j].start) / 60;
+            },
+            timeOnly: slot.members.every(x => kfs[x.m].trigger !== 'sun')
+          });
+        }
+      };
+
+      // One slot per keyframe; a group with a priority rule is one slot
       const doneGroups = new Set();
       kfs.forEach((kf, i) => {
         const g = groupOf(i);
-        if (!g) { entries.push(ownEntry(i)); return; }
-        if (doneGroups.has(g.id)) return;
-        doneGroups.add(g.id);
-        const members = g.members.map(m => ({ m, e: ownEntry(m) }));
-        const shifts = new Set(g.members.map(m => (ramping(m) ? 'ramp' : ownShift(m))));
-        if (shifts.size > 1) warnings.push({ type: 'group', group: g.id });
-        entries.push({
-          json: { type: g.rule.toUpperCase(), entries: members.map(x => x.e.json) },
-          timeOn: d => {
-            const w = members.find(x => perDay[d][x.m] != null);
-            return w ? w.e.timeOn(d) : null;
-          },
-          timeOnly: members.every(x => x.e.timeOnly)
-        });
+        if (g) {
+          if (doneGroups.has(g.id)) return;
+          doneGroups.add(g.id);
+          const shifts = new Set(g.members.map(m => (ramping(m) ? 'ramp' : ownShift(m))));
+          if (shifts.size > 1) warnings.push({ type: 'group', group: g.id });
+        }
+        emit(slotFor(i));
       });
+      if (linear.size) warnings.push({ type: 'linear', kfs: [...linear].sort((a, b) => a - b) });
 
       // The PICO expects each day's entries in chronological order. Sort by
       // the median time of the year and report the days that break it.
@@ -4364,6 +4428,7 @@ const translations = {
     function renderPico() {
       const details = document.getElementById('picoDetails');
       if (!details.open) return;
+      document.getElementById('picoBus').value = state.picoBus === 'free' ? 'free' : 'dali';
       const result = buildPicoScheduler();
       const text = picoJsonText(result);
       const loc = getLocation();
@@ -4690,6 +4755,11 @@ const translations = {
     document.getElementById('downloadPdfBtn').addEventListener('click', downloadPdf);
     document.getElementById('downloadPicoBtn').addEventListener('click', downloadPico);
     document.getElementById('picoDetails').addEventListener('toggle', renderPico);
+    document.getElementById('picoBus').addEventListener('change', e => {
+      state.picoBus = e.target.value;
+      saveState();
+      renderPico();
+    });
     document.getElementById('downloadCsvBtn').addEventListener('click', downloadCsv);
     document.getElementById('importFromTextBtn').addEventListener('click', importFromText);
 

@@ -64,9 +64,12 @@ Reference values (Berlin 21.06.: sunrise 04:43, sunset 21:33; 21.12.:
 - All texts in `translations` for de / en / es
 - Table shows settings only; times appear in the day/year views
 - PICO export (`buildPicoScheduler`) mirrors `evaluateSchedule`: when the
-  evaluation rules change, adapt the entry mapping too. Keep it one entry per
-  keyframe — the PICO (ESP32) handles large files badly and DALI must not be
+  evaluation rules change, adapt the entry mapping too. As few entries as
+  possible — the PICO (ESP32) handles large files badly and DALI must not be
   flooded with small steps; differences go into the warning list instead
+- DALI: no fade longer than 15 min (extended fade time ends at 16 min). The
+  PICO export splits longer fades (`PICO_DALI_MAX_FADE`); the HA light types
+  must follow the same limit
 
 ## Tests
 
