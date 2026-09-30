@@ -14,6 +14,7 @@ You define keyframes — each with a trigger, brightness and colour temperature.
 
 - **Triggers:** a fixed time or a sun event at the location (twilights, sunrise, solar noon, golden hour, sunset, solar midnight) with an offset in minutes and optional bounds *not before / not after*.
 - **Groups:** keyframes with the same role (e.g. “sunset” and “20:00”) can be grouped; per day only the earliest, the latest or all of them apply.
+- **Valid on:** a keyframe can be limited to weekdays and/or a yearly period (e.g. Mon–Fri, 01.11.–28.02.), like *valid on* on the PICO. A day without any keyframe keeps the last value; across midnight the real previous day counts.
 - **One instance = one schedule** for any number of lights. Another instance is only needed for a different schedule.
 
 ---

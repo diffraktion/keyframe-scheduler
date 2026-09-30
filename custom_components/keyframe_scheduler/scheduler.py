@@ -18,7 +18,7 @@ mirror the web app (www/index.html: resolveKeyframeMinutes, listGroups).
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from math import cos, floor, pi
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -94,6 +94,15 @@ class Keyframe:
     not_after: Optional[str] = None  # HH:MM
     group: str = ""  # "" or A-H
     id: str = ""  # stable id from the web app (informational)
+    # Valid on (the PICO's `days` filter): weekdays 0=Mon..6=Sun (None = every
+    # day) and an optional (month, day) period, both ends inclusive; a period
+    # with valid_to before valid_from spans New Year. Both must hold.
+    valid_weekdays: Optional[Tuple[int, ...]] = None
+    valid_from: Optional[Tuple[int, int]] = None
+    valid_to: Optional[Tuple[int, int]] = None
+    # Set on resolved keyframes: minutes relative to the midnight of the day
+    # being evaluated (may lie before 0 or after 1440, see Evaluator.timeline_for)
+    minutes: Optional[float] = None
 
 
 GROUP_IDS = ("A", "B", "C", "D", "E", "F", "G", "H")
@@ -133,6 +142,55 @@ class ScheduleValues:
     kelvin: float
     dim: float
     transition_seconds: int
+
+
+WEEKDAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def _month_day(value: Any, field: str) -> Tuple[int, int]:
+    """'MM-DD' -> (month, day)."""
+    try:
+        month, day = (int(x) for x in str(value).split("-"))
+        date(2000, month, day)  # leap year: 02-29 is allowed
+    except (ValueError, TypeError) as err:
+        raise ValueError(f"Invalid {field}: {value}") from err
+    return month, day
+
+
+def _valid_on(data: Any) -> Tuple[Optional[Tuple[int, ...]], Optional[Tuple[int, int]], Optional[Tuple[int, int]]]:
+    """Parse a keyframe's "validOn" block -> (weekdays, from, to)."""
+    if not isinstance(data, dict):
+        return None, None, None
+    weekdays = None
+    if data.get("weekdays") is not None:
+        days = data["weekdays"]
+        if not isinstance(days, list) or any(d not in WEEKDAY_KEYS for d in days) or not days:
+            raise ValueError(f"Invalid validOn.weekdays: {days}")
+        weekdays = tuple(sorted({WEEKDAY_KEYS.index(d) for d in days}))
+        if len(weekdays) == 7:
+            weekdays = None
+    start = end = None
+    if data.get("from") or data.get("to"):
+        start = _month_day(data.get("from"), "validOn.from")
+        end = _month_day(data.get("to"), "validOn.to")
+    return weekdays, start, end
+
+
+def is_valid_on(kf: Keyframe, day: date) -> bool:
+    """Does `kf` apply on `day` (weekdays and period)? Mirrors isValidOn()."""
+    if kf.valid_weekdays is not None and day.weekday() not in kf.valid_weekdays:
+        return False
+    if kf.valid_from is not None and kf.valid_to is not None:
+        md = (day.month, day.day)
+        if kf.valid_from <= kf.valid_to:
+            return kf.valid_from <= md <= kf.valid_to
+        return md >= kf.valid_from or md <= kf.valid_to
+    return True
+
+
+def kf_minutes(kf: Keyframe) -> float:
+    """Time of a keyframe on the evaluation axis (see Keyframe.minutes)."""
+    return kf.minutes if kf.minutes is not None else float(parse_time(kf.time))
 
 
 def _optional_time(value: Any, field: str) -> Optional[str]:
@@ -196,6 +254,7 @@ def spec_from_dict(
 
         time_str = str(kf_data.get("time", "00:00"))
         parse_time(time_str)  # validate (also the fallback of sun keyframes)
+        valid_weekdays, valid_from, valid_to = _valid_on(kf_data.get("validOn"))
 
         keyframes.append(
             Keyframe(
@@ -213,6 +272,9 @@ def spec_from_dict(
                 not_after=_optional_time(kf_data.get("notAfter"), "notAfter"),
                 group=group,
                 id=str(kf_data.get("id") or ""),
+                valid_weekdays=valid_weekdays,
+                valid_from=valid_from,
+                valid_to=valid_to,
             )
         )
 
@@ -240,8 +302,11 @@ def resolve_keyframe_minutes(kf: Keyframe, day: date, spec: ScheduleSpec) -> Opt
     Sun keyframes: event time + offset, clamped to [not_before, not_after].
     If the event does not happen at all (polar day/night, astronomical
     twilight in a northern summer) or no location is known, the bound takes
-    over; without a bound the keyframe is skipped for that day.
+    over; without a bound the keyframe is skipped for that day. Days outside
+    the keyframe's valid-on filter: None.
     """
+    if not is_valid_on(kf, day):
+        return None
     if kf.trigger != "sun":
         return float(parse_time(kf.time))
 
@@ -293,7 +358,7 @@ def resolve_day(spec: ScheduleSpec, day: date) -> Tuple[Keyframe, ...]:
                 minutes[i] = None
 
     return tuple(
-        replace(kf, time=format_time(m))
+        replace(kf, time=format_time(m), minutes=m)
         for kf, m in zip(spec.keyframes, minutes)
         if m is not None
     )
@@ -312,6 +377,7 @@ class Evaluator:
         self.default_kelvin = default_kelvin
         self.default_dim = default_dim
         self._day_cache: Dict[date, Tuple[Keyframe, ...]] = {}
+        self._timeline_cache: Dict[date, Tuple[Keyframe, ...]] = {}
 
     def keyframes_for(self, day: date) -> Tuple[Keyframe, ...]:
         """Resolved keyframes of a local calendar day (cached)."""
@@ -320,6 +386,42 @@ class Evaluator:
             if len(self._day_cache) > 16:
                 self._day_cache.clear()
             cached = self._day_cache[day] = resolve_day(self.spec, day)
+        return cached
+
+    def timeline_for(self, day: date) -> Tuple[Keyframe, ...]:
+        """The keyframes around `day` on one time axis (minutes from its midnight).
+
+        The nearest earlier day that has keyframes (-1440*k), the day itself
+        and the nearest later day that has keyframes (+1440*k). The curve
+        across midnight comes from the real neighbouring days, and a day
+        without keyframes (valid-on filters) holds the last value, as the
+        PICO does. Mirrors the web app's resolveTimeline().
+        """
+        cached = self._timeline_cache.get(day)
+        if cached is not None:
+            return cached
+
+        def shifted(k: int) -> List[Keyframe]:
+            return [
+                replace(kf, minutes=kf_minutes(kf) + 1440 * k)
+                for kf in self.keyframes_for(day + timedelta(days=k))
+            ]
+
+        result: List[Keyframe] = []
+        for k in range(-1, -8, -1):
+            earlier = shifted(k)
+            if earlier:
+                result.extend(earlier)
+                break
+        result.extend(shifted(0))
+        for k in range(1, 8):
+            later = shifted(k)
+            if later:
+                result.extend(later)
+                break
+        if len(self._timeline_cache) > 16:
+            self._timeline_cache.clear()
+        cached = self._timeline_cache[day] = tuple(result)
         return cached
 
     def local_now(self, when: datetime) -> datetime:
@@ -341,15 +443,15 @@ class Evaluator:
             + (local.second + local.microsecond / 1_000_000) / 60.0
         )
 
-        return self._evaluate_at_minutes(time_of_day, self.keyframes_for(local.date()))
+        return self._evaluate_at_minutes(time_of_day, self.timeline_for(local.date()))
 
     def _evaluate_at_minutes(
         self, time_minutes: float, keyframes: Tuple[Keyframe, ...]
     ) -> ScheduleValues:
         """Evaluate at minutes since midnight for the day's resolved keyframes.
 
-        Across midnight the same day's list is used for the neighbouring days
-        (sun times move by a few minutes per day at most).
+        `keyframes` is normally a timeline (see timeline_for) that already
+        holds the neighbouring days; a plain day list wraps onto itself.
         """
         if not keyframes:
             return ScheduleValues(
@@ -359,7 +461,7 @@ class Evaluator:
             )
 
         # Sort keyframes by time
-        sorted_kf = sorted(keyframes, key=lambda k: parse_time(k.time))
+        sorted_kf = sorted(keyframes, key=kf_minutes)
 
         # Find previous and next keyframes
         prev_kf = None
@@ -367,7 +469,7 @@ class Evaluator:
         before_prev_kf = None  # Keyframe before prev_kf
 
         for i, kf in enumerate(sorted_kf):
-            kf_time = parse_time(kf.time)
+            kf_time = kf_minutes(kf)
 
             if kf_time <= time_minutes:
                 # Update before_prev before updating prev
@@ -382,16 +484,16 @@ class Evaluator:
         if prev_kf is None and sorted_kf:
             # Before first keyframe - use last from previous day
             last_kf = sorted_kf[-1]
-            prev_kf = (last_kf, parse_time(last_kf.time) - 1440)
+            prev_kf = (last_kf, kf_minutes(last_kf) - 1440)
             # before_prev would be second-to-last
             if len(sorted_kf) > 1:
                 before_last_kf = sorted_kf[-2]
-                before_prev_kf = (before_last_kf, parse_time(before_last_kf.time) - 1440)
+                before_prev_kf = (before_last_kf, kf_minutes(before_last_kf) - 1440)
 
         if next_kf is None and sorted_kf:
             # After last keyframe - use first from next day
             first_kf = sorted_kf[0]
-            next_kf = (first_kf, parse_time(first_kf.time) + 1440)
+            next_kf = (first_kf, kf_minutes(first_kf) + 1440)
 
         # No previous keyframe - use default or next
         if prev_kf is None:
@@ -557,7 +659,7 @@ class Evaluator:
            - If yes: Continue interpolating to next
            - If no: Hold value until next keyframe
         """
-        sorted_kf = sorted(keyframes, key=lambda k: parse_time(k.time))
+        sorted_kf = sorted(keyframes, key=kf_minutes)
         
         # Find current keyframe index
         current_index = None
@@ -646,7 +748,7 @@ class Evaluator:
         # Check for transitions/instants between this and next
         for i in range(current_index + 1, len(sorted_kf)):
             kf = sorted_kf[i]
-            kf_time = parse_time(kf.time)
+            kf_time = kf_minutes(kf)
             
             if kf_time >= next_time:
                 break

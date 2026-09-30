@@ -14,6 +14,7 @@ Du definierst Keyframes — jeweils mit Auslöser, Helligkeit und Farbtemperatur
 
 - **Auslöser:** eine feste Uhrzeit oder ein Sonnenereignis am Standort (Dämmerung, Sonnenaufgang, Sonnenmittag, goldene Stunde, Sonnenuntergang, Sonnenmitternacht) mit Versatz in Minuten und optionalen Grenzen *frühestens / spätestens*.
 - **Gruppen:** Keyframes mit derselben Rolle (z. B. „Sonnenuntergang“ und „20:00“) lassen sich gruppieren; pro Tag gilt dann nur der früheste, der späteste oder alle.
+- **Gültig an:** ein Keyframe lässt sich auf Wochentage und/oder einen Zeitraum im Jahr beschränken (z. B. Mo–Fr, 01.11.–28.02.), wie *valid on* im PICO. Ein Tag ganz ohne Keyframes hält den letzten Wert; über Mitternacht zählt der tatsächliche Vortag.
 - **Eine Instanz = ein Zeitplan** für beliebig viele Leuchten. Eine weitere Instanz braucht es nur für einen anderen Zeitplan.
 
 ---

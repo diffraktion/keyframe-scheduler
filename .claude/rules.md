@@ -12,7 +12,9 @@
      "mode": "interpolate", "curve": "sinus",
      "transitionSeconds": 600, "transitionDirection": "after",
      "trigger": "sun", "sunEvent": "sunset", "offsetMinutes": 30,
-     "notBefore": "18:00", "notAfter": "22:00", "group": "A"}
+     "notBefore": "18:00", "notAfter": "22:00", "group": "A",
+     "validOn": {"weekdays": ["mon", "tue", "wed", "thu", "fri"],
+                 "from": "10-01", "to": "03-31"}}
   ],
   "groups": [{"id": "A", "rule": "earliest"}]
 }
@@ -20,6 +22,8 @@
 
 - `time` is `HH:MM`; for sun keyframes it is only a fallback (today's value)
 - `dim` is 0–100 %, `kelvin` in K
+- `validOn` (optional): weekdays and/or a yearly `MM-DD` period, both ends
+  inclusive, `to` before `from` spans New Year — the PICO's `days` filter
 - `wrapAround` / `startDateTime` of old files are ignored — every schedule is
   a daily profile that continues across midnight
 - New fields must stay optional so old files keep working
@@ -33,6 +37,8 @@ The same rules live in JavaScript and Python — change both:
 | Sun events | `www/js/astro.js` | `astro.py` |
 | Resolve a day (offset, bounds, fallback) | `resolveKeyframeMinutes` | `resolve_keyframe_minutes` |
 | Group rules | `resolveFiringMinutes` | `resolve_day` |
+| Valid on (weekdays, period) | `isValidOn` | `is_valid_on` |
+| Neighbouring days across midnight | `resolveTimeline` | `Evaluator.timeline_for` |
 | Transition follow-up (only the *immediately* next keyframe, its curve) | `evaluateSchedule` | `_evaluate_transition` |
 
 Reference values (Berlin 21.06.: sunrise 04:43, sunset 21:33; 21.12.:
@@ -54,8 +60,9 @@ Reference values (Berlin 21.06.: sunrise 04:43, sunset 21:33; 21.12.:
 - Time of day from the local wall clock in the schedule's timezone
   (`Evaluator.local_now`) — never count minutes from a start instant (breaks
   on DST)
-- Midnight: the day's resolved list wraps (previous day's last keyframe at
-  −1440 min, next day's first at +1440 min)
+- Midnight: evaluate on the timeline — the nearest earlier and later day that
+  have keyframes, at −1440·k / +1440·k min. A day without keyframes (valid-on)
+  holds the last value, like the PICO
 
 ## Webapp
 

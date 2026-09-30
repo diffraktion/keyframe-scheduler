@@ -222,5 +222,74 @@ class EvaluateTest(unittest.TestCase):
         self.assertEqual(dim_at(ev, date(2026, 3, 29), "06:59"), 10)
 
 
+class ValidOnTest(unittest.TestCase):
+    """Valid-on filters (the PICO's `days`): weekdays and a yearly period."""
+
+    # 2026-10-05 is a Monday
+    MON, FRI, SAT, SUN = date(2026, 10, 5), date(2026, 10, 9), date(2026, 10, 10), date(2026, 10, 11)
+
+    def test_parse(self):
+        spec = spec_from_dict(schedule([
+            kf("07:00", 4000, 100, "instant", validOn={"weekdays": ["mon", "fri"], "from": "11-01", "to": "02-28"}),
+            kf("08:00", 4000, 100, "instant", validOn={"weekdays": list(("mon", "tue", "wed", "thu", "fri", "sat", "sun"))}),
+        ]))
+        self.assertEqual(spec.keyframes[0].valid_weekdays, (0, 4))
+        self.assertEqual((spec.keyframes[0].valid_from, spec.keyframes[0].valid_to), ((11, 1), (2, 28)))
+        self.assertIsNone(spec.keyframes[1].valid_weekdays)   # all seven = every day
+        for bad in ({"weekdays": ["xyz"]}, {"weekdays": []}, {"from": "13-01", "to": "01-01"}, {"from": "05-01"}):
+            with self.assertRaises(ValueError):
+                spec_from_dict(schedule([kf("07:00", 4000, 100, "instant", validOn=bad)]))
+
+    def test_weekdays_and_period_over_new_year(self):
+        spec = spec_from_dict(schedule([
+            kf("07:00", 4000, 100, "instant", validOn={"weekdays": ["mon", "tue", "wed", "thu", "fri"]}),
+            kf("09:00", 3000, 50, "instant", validOn={"from": "12-20", "to": "01-06"}),
+            kf("22:00", 2700, 10, "instant"),
+        ]))
+        self.assertEqual(times(spec, self.FRI), ["07:00", "22:00"])
+        self.assertEqual(times(spec, self.SAT), ["22:00"])
+        self.assertEqual(times(spec, date(2026, 12, 31)), ["07:00", "09:00", "22:00"])   # Thursday
+        self.assertEqual(times(spec, date(2027, 1, 6)), ["07:00", "09:00", "22:00"])
+        self.assertEqual(times(spec, date(2027, 1, 7)), ["07:00", "22:00"])
+
+    def test_day_without_keyframes_holds_the_last_value(self):
+        # Weekdays only: the weekend keeps Friday evening's value, Monday
+        # morning starts from it too
+        spec = spec_from_dict(schedule([
+            kf("07:00", 4000, 100, "instant", validOn={"weekdays": ["mon", "tue", "wed", "thu", "fri"]}),
+            kf("18:00", 2700, 20, "instant", validOn={"weekdays": ["mon", "tue", "wed", "thu", "fri"]}),
+        ]))
+        ev = Evaluator(spec)
+        self.assertEqual(dim_at(ev, self.FRI, "12:00"), 100)
+        self.assertEqual(dim_at(ev, self.SAT, "12:00"), 20)
+        self.assertEqual(dim_at(ev, self.SUN, "12:00"), 20)
+        self.assertEqual(dim_at(ev, self.MON, "06:00"), 20)
+        self.assertEqual(dim_at(ev, self.MON, "08:00"), 100)
+
+    def test_midnight_uses_the_real_previous_day(self):
+        # Sunday evening differs from the other evenings: Monday 02:00 must
+        # show Sunday's value, not Monday's own last keyframe
+        spec = spec_from_dict(schedule([
+            kf("07:00", 4000, 100, "instant"),
+            kf("22:00", 2700, 10, "instant", validOn={"weekdays": ["mon", "tue", "wed", "thu", "fri", "sat"]}),
+            kf("22:00", 2700, 40, "instant", validOn={"weekdays": ["sun"]}),
+        ]))
+        ev = Evaluator(spec)
+        self.assertEqual(dim_at(ev, self.MON, "02:00"), 40)
+        self.assertEqual(dim_at(ev, date(2026, 10, 6), "02:00"), 10)   # Tuesday: Monday evening
+
+    def test_interpolation_runs_from_the_previous_day(self):
+        # 20:00 -> 06:00 (next morning) ramps overnight, starting on the
+        # previous day's timeline entry
+        spec = spec_from_dict(schedule([
+            kf("06:00", 4000, 100, "interpolate", curve="linear"),
+            kf("20:00", 2700, 0, "interpolate", curve="linear",
+               validOn={"weekdays": ["mon", "tue", "wed", "thu", "fri", "sun"]}),
+        ]))
+        ev = Evaluator(spec)
+        # Tuesday 01:00: 5 h into the 10 h ramp from Monday 20:00 (0 %) to 100 %
+        self.assertEqual(dim_at(ev, date(2026, 10, 6), "01:00"), 50)
+
+
 if __name__ == "__main__":
     unittest.main()

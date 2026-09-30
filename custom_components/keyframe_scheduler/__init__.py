@@ -37,7 +37,7 @@ from .const import (
     SERVICE_SET_SCHEDULE,
     SERVICE_UPLOAD_FROM_FILE,
 )
-from .scheduler import Evaluator, Keyframe, kelvin_to_mired, spec_from_dict
+from .scheduler import Evaluator, Keyframe, kelvin_to_mired, kf_minutes, spec_from_dict
 from .light_control import PAUSE_MANUAL, KeyframeLightController
 from .light_logic import LightProfile, lights_from_options
 from .store import ScheduleStore
@@ -127,17 +127,19 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
     @staticmethod
     def _same_keyframe(a: Keyframe, b: Keyframe) -> bool:
         """Same schedule entry, ignoring the (daily resolved) time."""
-        return replace(a, time="") == replace(b, time="")
+        return replace(a, time="", minutes=None) == replace(b, time="", minutes=None)
 
     def _occurrences(self, now: datetime) -> List[Tuple[Keyframe, datetime]]:
-        """Resolved keyframes of today and tomorrow with their local datetimes.
+        """Resolved keyframes of yesterday, today and tomorrow with their local
+        datetimes (yesterday: a transition may still run past midnight).
 
-        Sun keyframes and groups make the firing times differ from day to day,
-        so every day is resolved on its own (see scheduler.resolve_day).
+        Sun keyframes, groups and valid-on filters make the firing times differ
+        from day to day, so every day is resolved on its own (see
+        scheduler.resolve_day).
         """
         local = self.evaluator.local_now(now)
         result = []
-        for offset in (0, 1):
+        for offset in (-1, 0, 1):
             day = local.date() + timedelta(days=offset)
             for kf in self.evaluator.keyframes_for(day):
                 h, m = map(int, kf.time.split(':'))
@@ -162,24 +164,23 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
         return times
 
     def _find_keyframe_segment(self, now: datetime):
-        """Find previous and next keyframe of today's resolved keyframes."""
+        """Previous and next keyframe around now, on today's timeline (which
+        holds the neighbouring days with keyframes, see Evaluator.timeline_for)."""
         local = self.evaluator.local_now(now)
-        today = self.evaluator.keyframes_for(local.date())
-        sorted_kf = sorted(today, key=lambda k: self._parse_time(k.time))
+        timeline = self.evaluator.timeline_for(local.date())
+        sorted_kf = sorted(timeline, key=kf_minutes)
         now_minutes = local.hour * 60 + local.minute
-        
+
         prev_kf = None
         next_kf = None
-        
+
         for kf in reversed(sorted_kf):
-            kf_minutes = self._parse_time(kf.time)
-            if kf_minutes <= now_minutes:
+            if kf_minutes(kf) <= now_minutes:
                 prev_kf = kf
                 break
-        
+
         for kf in sorted_kf:
-            kf_minutes = self._parse_time(kf.time)
-            if kf_minutes > now_minutes:
+            if kf_minutes(kf) > now_minutes:
                 next_kf = kf
                 break
         

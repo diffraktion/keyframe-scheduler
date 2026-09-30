@@ -5,7 +5,13 @@
 ### [Unreleased]
 
 #### Added
+- **Valid on** per keyframe (like the PICO's *valid on*): weekdays and/or a yearly period (inclusive, may span New Year). Web app: column "Valid" with an editor row (weekday chips, Mon–Fri / Sat–Sun, period); export `validOn: { weekdays, from, to }`; the integration honours it (`scheduler.is_valid_on`); PDF lists it. PICO export writes it as the entry's `days` filter — including shifted filters for entries that start the evening before, and negated filters so an interpolation gets a ramp from each of its predecessors
+- Tests: valid-on parsing, weekdays, period across New Year, days without keyframes, midnight after a differing evening, overnight interpolation
 - Web app: **PICO DailyScheduler** export — the schedule as the `DAILYSCHEDULER` behavior of a PICO lightnode `setup.json` (sun triggers with offset, not-before/not-after bounds as nested `EARLIEST`/`LATEST`, groups as composites; solar midnight as noon −12 h, golden hour as sunrise/sunset + the year's mean distance). Output selectable: **DALI** splits fades longer than 15 min into whole-minute pieces on the keyframe's curve and compensates the PICO's rounding of DALI fade times (exactly 900 s would become 16 min); **DMX / other** keeps one entry per keyframe. Preview with entry count, size and a list of differences from the simulation (linear fades instead of sine, fixed fade length of sun-anchored interpolations, changing predecessors, order changes during the year)
+
+#### Changed
+- Evaluation across midnight uses the real neighbouring days (web app `resolveTimeline`, integration `Evaluator.timeline_for`): the night after a differing evening follows that evening, and a day without keyframes holds the last value (as the PICO does). Previously the same day's list was wrapped onto itself
+- Coordinator: transitions of yesterday that run past midnight are stepped through as well
 
 ### [4.0.0-beta.1] - 2026-09-30 — not tested yet
 

@@ -131,6 +131,27 @@
 
     .keyframes-table td.is-inactive > * { opacity: .35; }
 
+    /* Valid-on: summary chip in the row, editor in a row below */
+    .keyframes-table .valid-toggle { white-space: nowrap; }
+    .keyframes-table tbody tr.valid-row:hover td { background: transparent; }
+    .valid-editor {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--lkl-space-2);
+      padding: var(--lkl-space-2) var(--lkl-space-3);
+      border-left: 2px solid var(--lkl-accent);
+      background: var(--lkl-surface-2);
+      border-radius: var(--lkl-radius-sm);
+      /* The table may scroll sideways; keep the editor in view */
+      position: sticky;
+      left: 0;
+      max-width: min(1000px, calc(100vw - 6 * var(--lkl-space-4)));
+    }
+    .valid-dates { display: inline-flex; align-items: center; gap: var(--lkl-space-1); }
+    .keyframes-table .valid-editor input.valid-day { width: 56px; }
+    .valid-help { flex-basis: 100%; font-size: var(--lkl-fs-sm); color: var(--lkl-text-3); }
+
     .hms { display: flex; gap: var(--lkl-space-1); align-items: center; }
     .hms-sep { color: var(--lkl-text-3); }
 
@@ -786,8 +807,69 @@
         offsetMinutes: Number.isFinite(kf.offsetMinutes) ? kf.offsetMinutes : 0,
         notBefore: kf.notBefore || '',
         notAfter: kf.notAfter || '',
-        group: GROUP_IDS.includes(kf.group) ? kf.group : ''
+        group: GROUP_IDS.includes(kf.group) ? kf.group : '',
+        ...normalizeValidOn(kf.validOn || kf)
       };
+    }
+
+    // ---- Valid on (PICO "valid on" day filter) ------------------------------
+    //
+    // A keyframe fires only on its weekdays (validDays, all 7 = every day) and
+    // — if set — between validFrom and validTo ('MM-DD', both inclusive; a
+    // range with to < from spans New Year). Both conditions must hold, as in
+    // the PICO's `days` filter (DAYS_OF_WEEK + DAYS_OF_YEAR). Export format:
+    // "validOn": { "weekdays": ["mon", …], "from": "05-01", "to": "09-30" }.
+
+    const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    const MONTH_DAY = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+    /** { validDays, validFrom, validTo } from a keyframe or a validOn block. */
+    function normalizeValidOn(src) {
+      const days = src.validDays || src.weekdays;
+      const validDays = Array.isArray(days) ? WEEKDAYS.filter(d => days.includes(d)) : WEEKDAYS.slice();
+      const from = src.validFrom ?? src.from ?? '';
+      const to = src.validTo ?? src.to ?? '';
+      const range = MONTH_DAY.test(from) && MONTH_DAY.test(to);
+      return {
+        validDays: validDays.length ? validDays : WEEKDAYS.slice(),
+        validFrom: range ? from : '',
+        validTo: range ? to : ''
+      };
+    }
+
+    function hasValidOn(kf) {
+      return kf.validDays.length < 7 || !!kf.validFrom;
+    }
+
+    function isValidOn(kf, dateStr) {
+      const { y, m, d } = parseDate(dateStr);
+      if (kf.validDays.length < 7) {
+        const weekday = WEEKDAYS[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7];
+        if (!kf.validDays.includes(weekday)) return false;
+      }
+      if (kf.validFrom && kf.validTo) {
+        const md = m * 100 + d;
+        const num = s => +s.slice(0, 2) * 100 + +s.slice(3);
+        const from = num(kf.validFrom), to = num(kf.validTo);
+        return from <= to ? md >= from && md <= to : md >= from || md <= to;
+      }
+      return true;
+    }
+
+    /** "Mo–Fr · 01.05.–30.09." — empty when the keyframe is valid every day. */
+    function validSummary(kf) {
+      const parts = [];
+      if (kf.validDays.length < 7) {
+        const idx = kf.validDays.map(d => WEEKDAYS.indexOf(d));
+        const run = idx.every((v, k) => k === 0 || v === idx[k - 1] + 1);
+        const name = i => t('day_' + WEEKDAYS[i]);
+        parts.push(run && idx.length > 2 ? `${name(idx[0])}–${name(idx[idx.length - 1])}` : idx.map(name).join(', '));
+      }
+      if (kf.validFrom) {
+        const fmt = s => `${s.slice(3)}.${s.slice(0, 2)}.`;
+        parts.push(`${fmt(kf.validFrom)}–${fmt(kf.validTo)}`);
+      }
+      return parts.join(' · ');
     }
 
     /**
@@ -799,6 +881,7 @@
      * the keyframe is skipped for that day.
      */
     function resolveKeyframeMinutes(kf, dateStr) {
+      if (!isValidOn(kf, dateStr)) return null;
       if (kf.trigger !== 'sun') return parseTime(kf.time);
 
       const lo = kf.notBefore ? parseTime(kf.notBefore) : null;
@@ -819,7 +902,13 @@
 
     // Resolved keyframe lists per date. Invalidated on every state change.
     let resolvedCache = new Map();
-    function invalidateResolved() { resolvedCache = new Map(); yearGrid = null; conflictCache = null; hintCache = null; }
+    function invalidateResolved() {
+      resolvedCache = new Map();
+      timelineCache = new Map();
+      yearGrid = null;
+      conflictCache = null;
+      hintCache = null;
+    }
 
     // ---- Keyframe groups & order conflicts ----------------------------------
     //
@@ -1257,13 +1346,29 @@ const translations = {
     pico_no_warnings: "Keine Abweichungen – der PICO fährt denselben Verlauf wie die Simulation.",
     pico_warn_linear: "{list}: Sinus-Kurve wird als linearer Fade exportiert (der PICO blendet nur linear).",
     pico_warn_fade: "{k}: Die Interpolation dauert je nach Tag {min}–{max}. Der PICO blendet immer {min} lang und hält danach den Wert.",
-    pico_warn_pred: "{k} startet im PICO immer nach {p}; an {n} Tagen folgt es in der Simulation auf einen anderen Keyframe.",
+    pico_warn_pred: "{k}: An {n} Tagen folgt es auf einen Keyframe, dessen Tage sich nicht als PICO-Filter ausdrücken lassen – dort springt der PICO zur Zeit von {k} auf den Wert, statt zu interpolieren.",
     pico_warn_substitute: "{k}: „{event}“ kennt der PICO nicht – exportiert als „{base}“ {offset} (Abweichung bis {dev} min).",
     pico_warn_group: "{g}: Die Mitglieder beginnen unterschiedlich früh (Transition davor / Interpolation). Der PICO vergleicht die Startzeiten, nicht die Keyframe-Zeiten – der Gewinner kann abweichen.",
     pico_warn_order: "Die Reihenfolge der Einträge wechselt an {n} Tagen ({ranges}). Der PICO verlangt pro Tag eine chronologische Reihenfolge – Konflikte gruppieren.",
+    pico_warn_size: "Der Block ist {kb} KB groß – größer als die bisher erprobten PICO-Setups (ca. 34 KB inkl. Targets). Vor dem Einsatz auf dem PICO testen; lange Interpolationen, besonders über Nacht, sparen am meisten ein.",
     pico_bus: "Ausgang",
     pico_bus_dali: "DALI – Fades bis 15 min",
     pico_bus_free: "DMX / andere – Fades ohne Grenze",
+    th_valid: "Gültig",
+    valid_title: "An welchen Tagen der Keyframe gilt",
+    valid_daily: "Täglich",
+    valid_weekdays: "Wochentage",
+    valid_period: "Zeitraum",
+    valid_all: "Alle",
+    valid_workdays: "Mo–Fr",
+    valid_weekend: "Sa–So",
+    valid_from: "von",
+    valid_to: "bis",
+    valid_dd: "TT",
+    valid_mm: "MM",
+    valid_clear: "Zeitraum entfernen",
+    valid_help: "Der Keyframe gilt nur an den gewählten Wochentagen und – falls gesetzt – im Zeitraum (jedes Jahr, auch über den Jahreswechsel, z. B. 01.11.–28.02.). An anderen Tagen entfällt er; ein Tag ganz ohne Keyframes hält den letzten Wert. Entspricht „valid on“ im PICO.",
+    day_mon: "Mo", day_tue: "Di", day_wed: "Mi", day_thu: "Do", day_fri: "Fr", day_sat: "Sa", day_sun: "So",
     days_short: "Tage",
     
     // Modes
@@ -1501,13 +1606,29 @@ const translations = {
     pico_no_warnings: "No differences – the PICO runs the same curve as the simulation.",
     pico_warn_linear: "{list}: sine curve is exported as a linear fade (the PICO only fades linearly).",
     pico_warn_fade: "{k}: the interpolation takes {min}–{max} depending on the day. The PICO always fades for {min} and then holds the value.",
-    pico_warn_pred: "{k} always starts after {p} on the PICO; on {n} days the simulation has another keyframe before it.",
+    pico_warn_pred: "{k}: on {n} days it follows a keyframe whose days cannot be expressed as a PICO filter – there the PICO jumps to the value at {k}'s time instead of interpolating.",
     pico_warn_substitute: "{k}: the PICO has no \"{event}\" – exported as \"{base}\" {offset} (up to {dev} min off).",
     pico_warn_group: "{g}: the members start at different lead times (transition before / interpolation). The PICO compares start times, not keyframe times – the winner may differ.",
     pico_warn_order: "The order of the entries changes on {n} days ({ranges}). The PICO needs each day's entries in chronological order – group the conflicts.",
+    pico_warn_size: "The block is {kb} KB – larger than the PICO setups tried so far (about 34 KB including targets). Test it on the PICO first; long interpolations, especially overnight, save the most.",
     pico_bus: "Output",
     pico_bus_dali: "DALI – fades up to 15 min",
     pico_bus_free: "DMX / other – unlimited fades",
+    th_valid: "Valid",
+    valid_title: "Days on which the keyframe applies",
+    valid_daily: "Daily",
+    valid_weekdays: "Weekdays",
+    valid_period: "Period",
+    valid_all: "All",
+    valid_workdays: "Mon–Fri",
+    valid_weekend: "Sat–Sun",
+    valid_from: "from",
+    valid_to: "to",
+    valid_dd: "DD",
+    valid_mm: "MM",
+    valid_clear: "Remove period",
+    valid_help: "The keyframe only applies on the selected weekdays and – if set – within the period (every year, also across New Year, e.g. 01.11.–28.02.). On other days it is skipped; a day without any keyframe holds the last value. Same as \"valid on\" on the PICO.",
+    day_mon: "Mo", day_tue: "Tu", day_wed: "We", day_thu: "Th", day_fri: "Fr", day_sat: "Sa", day_sun: "Su",
     days_short: "days",
     
     // Modes
@@ -1745,13 +1866,29 @@ const translations = {
     pico_no_warnings: "Sin diferencias – el PICO ejecuta la misma curva que la simulación.",
     pico_warn_linear: "{list}: la curva sinusoidal se exporta como fundido lineal (el PICO solo funde linealmente).",
     pico_warn_fade: "{k}: la interpolación dura {min}–{max} según el día. El PICO funde siempre {min} y luego mantiene el valor.",
-    pico_warn_pred: "{k} empieza en el PICO siempre después de {p}; durante {n} días la simulación tiene otro keyframe antes.",
+    pico_warn_pred: "{k}: durante {n} días sigue a un keyframe cuyos días no se pueden expresar como filtro PICO – allí el PICO salta al valor a la hora de {k} en lugar de interpolar.",
     pico_warn_substitute: "{k}: el PICO no conoce «{event}» – se exporta como «{base}» {offset} (desviación hasta {dev} min).",
     pico_warn_group: "{g}: los miembros empiezan con distinta antelación (transición antes / interpolación). El PICO compara las horas de inicio, no las de los keyframes – el ganador puede variar.",
     pico_warn_order: "El orden de las entradas cambia durante {n} días ({ranges}). El PICO necesita las entradas de cada día en orden cronológico – agrupa los conflictos.",
+    pico_warn_size: "El bloque ocupa {kb} KB – más que los setups PICO probados hasta ahora (unos 34 KB con targets). Pruébalo antes en el PICO; las interpolaciones largas, sobre todo nocturnas, son las que más ocupan.",
     pico_bus: "Salida",
     pico_bus_dali: "DALI – fundidos hasta 15 min",
     pico_bus_free: "DMX / otros – fundidos sin límite",
+    th_valid: "Válido",
+    valid_title: "Días en que se aplica el keyframe",
+    valid_daily: "Diario",
+    valid_weekdays: "Días de la semana",
+    valid_period: "Periodo",
+    valid_all: "Todos",
+    valid_workdays: "Lu–Vi",
+    valid_weekend: "Sá–Do",
+    valid_from: "desde",
+    valid_to: "hasta",
+    valid_dd: "DD",
+    valid_mm: "MM",
+    valid_clear: "Quitar periodo",
+    valid_help: "El keyframe solo se aplica en los días de la semana elegidos y – si se define – dentro del periodo (cada año, también a través del Año Nuevo, p. ej. 01.11.–28.02.). Los demás días se omite; un día sin keyframes mantiene el último valor. Equivale a «valid on» en el PICO.",
+    day_mon: "Lu", day_tue: "Ma", day_wed: "Mi", day_thu: "Ju", day_fri: "Vi", day_sat: "Sá", day_sun: "Do",
     days_short: "días",
     
     // Modes
@@ -2459,6 +2596,7 @@ const translations = {
               <th style="width: 40px;">#</th>
               <th style="width: 60px;">${t('th_group')}</th>
               <th>${t('th_time')}</th>
+              <th style="width: 110px;">${t('th_valid')}</th>
               <th style="width: 100px;">${t('th_brightness')}</th>
               <th style="width: 100px;">${t('th_kelvin')}</th>
               <th style="width: 120px;">${t('th_mode')}</th>
@@ -2486,6 +2624,11 @@ const translations = {
               </select>
             </td>
             <td class="trigger-td">${renderTriggerCell(kf, index)}</td>
+            <td>
+              <button class="lkl-chip is-compact valid-toggle ${hasValidOn(kf) ? 'is-active' : ''}"
+                      aria-expanded="${validOpen.has(kf.id)}" title="${t('valid_title')}"
+                      onclick="toggleValidEditor('${kf.id}')">${validSummary(kf) || t('valid_daily')}</button>
+            </td>
             <td>
               <input class="lkl-input" type="number" min="0" max="100" step="5"
                      value="${kf.dim}"
@@ -2553,6 +2696,7 @@ const translations = {
             </td>
           </tr>
         `;
+        if (validOpen.has(kf.id)) html += renderValidEditor(kf, index);
       });
 
       html += `
@@ -2567,11 +2711,90 @@ const translations = {
       setupDragAndDrop();
     }
 
+    // Valid-on editors that are open (by keyframe id), shown as an extra row
+    // below the keyframe
+    const validOpen = new Set();
+
+    function toggleValidEditor(id) {
+      if (validOpen.has(id)) validOpen.delete(id); else validOpen.add(id);
+      renderKeyframes();
+    }
+
+    function renderValidEditor(kf, index) {
+      const dayChips = WEEKDAYS.map(d => `
+        <button class="lkl-chip is-compact ${kf.validDays.includes(d) ? 'is-active' : ''}"
+                onclick="toggleValidDay(${index}, '${d}')">${t('day_' + d)}</button>`).join('');
+      const presets = [['all', WEEKDAYS], ['workdays', WEEKDAYS.slice(0, 5)], ['weekend', WEEKDAYS.slice(5)]]
+        .map(([key, days]) => `
+          <button class="lkl-btn is-small is-quiet" onclick="setValidDays(${index}, '${days.join(',')}')">${t('valid_' + key)}</button>`)
+        .join('');
+      const md = s => (s ? { d: +s.slice(3), m: +s.slice(0, 2) } : { d: '', m: '' });
+      const from = md(kf.validFrom), to = md(kf.validTo);
+      const dateInputs = (which, v) => `
+        <input class="lkl-input valid-day" type="number" min="1" max="31" step="1" value="${v.d}" placeholder="${t('valid_dd')}"
+               aria-label="${t('valid_' + which)} ${t('valid_dd')}" data-valid="${which}-d">
+        <span class="hms-sep">.</span>
+        <input class="lkl-input valid-day" type="number" min="1" max="12" step="1" value="${v.m}" placeholder="${t('valid_mm')}"
+               aria-label="${t('valid_' + which)} ${t('valid_mm')}" data-valid="${which}-m">`;
+      return `
+        <tr class="valid-row">
+          <td colspan="12">
+            <div class="valid-editor" onchange="updateValidRange(${index}, this)">
+              <span class="control-group-label">${t('valid_weekdays')}</span>
+              <span class="lkl-chip-row">${dayChips}</span>
+              ${presets}
+              <span class="toolbar-sep"></span>
+              <span class="control-group-label">${t('valid_period')}</span>
+              <span class="valid-dates">${dateInputs('from', from)}<span class="hms-sep">–</span>${dateInputs('to', to)}</span>
+              ${kf.validFrom ? `<button class="lkl-btn is-small is-quiet" onclick="clearValidRange(${index})">${t('valid_clear')}</button>` : ''}
+              <span class="valid-help">${t('valid_help')}</span>
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    function toggleValidDay(index, day) {
+      const kf = state.keyframes[index];
+      const days = kf.validDays.includes(day) ? kf.validDays.filter(d => d !== day) : kf.validDays.concat(day);
+      if (!days.length) return;   // at least one day, like the PICO's DAYS_OF_WEEK filter
+      kf.validDays = WEEKDAYS.filter(d => days.includes(d));
+      saveState();
+      updateUI();
+    }
+
+    function setValidDays(index, days) {
+      state.keyframes[index].validDays = days.split(',');
+      saveState();
+      updateUI();
+    }
+
+    /** Period from the four day/month fields; applied once all four are valid. */
+    function updateValidRange(index, editor) {
+      const val = key => parseInt(editor.querySelector(`[data-valid="${key}"]`).value, 10);
+      const [fd, fm, td, tm] = ['from-d', 'from-m', 'to-d', 'to-m'].map(val);
+      const ok = (d, m) => m >= 1 && m <= 12 && d >= 1 && d <= new Date(Date.UTC(2024, m, 0)).getUTCDate();
+      if (!ok(fd, fm) || !ok(td, tm)) return;
+      const pad = n => String(n).padStart(2, '0');
+      const kf = state.keyframes[index];
+      kf.validFrom = `${pad(fm)}-${pad(fd)}`;
+      kf.validTo = `${pad(tm)}-${pad(td)}`;
+      saveState();
+      updateUI();
+    }
+
+    function clearValidRange(index) {
+      Object.assign(state.keyframes[index], { validFrom: '', validTo: '' });
+      saveState();
+      updateUI();
+    }
+
     function setupDragAndDrop() {
-      const rows = document.querySelectorAll('.keyframes-table tbody tr');
+      // Keyframe rows only (the valid-on editor rows in between are skipped)
+      const rows = document.querySelectorAll('.keyframes-table tbody tr[data-index]');
       let draggedIndex = null;
 
-      rows.forEach((row, index) => {
+      rows.forEach(row => {
+        const index = +row.dataset.index;
         row.addEventListener('dragstart', (e) => {
           draggedIndex = index;
           row.classList.add('is-dragging');
@@ -2602,20 +2825,52 @@ const translations = {
     // SCHEDULER LOGIC
     // ============================================================================
 
+    /** Keyframe time on the evaluation axis: `minutes` on a timeline (may lie
+        before 0 or after 1440), otherwise its HH:MM. */
+    const kfMinutes = kf => kf.minutes ?? parseTime(kf.time);
+
+    /**
+     * The keyframes around dateStr on one time axis (minutes from its
+     * midnight): the nearest earlier day that has keyframes (−1440·k), the
+     * day itself and the nearest later day that has keyframes (+1440·k). So
+     * the curve across midnight comes from the real neighbouring days, and a
+     * day without keyframes (valid-on filters) holds the last value — as the
+     * PICO does. Mirrors scheduler.py, Evaluator.timeline_for.
+     */
+    let timelineCache = new Map();
+    function resolveTimeline(dateStr) {
+      let list = timelineCache.get(dateStr);
+      if (list) return list;
+      const shifted = k => resolveKeyframes(addDays(dateStr, k))
+        .map(kf => ({ ...kf, minutes: parseTime(kf.time) + 1440 * k }));
+      list = [];
+      for (let k = -1; k >= -7; k--) {
+        const day = shifted(k);
+        if (day.length) { list.push(...day); break; }
+      }
+      list.push(...shifted(0));
+      for (let k = 1; k <= 7; k++) {
+        const day = shifted(k);
+        if (day.length) { list.push(...day); break; }
+      }
+      timelineCache.set(dateStr, list);
+      return list;
+    }
+
     function evaluateSchedule(timeMinutes, keyframes = state.keyframes) {
       if (keyframes.length === 0) {
         return { kelvin: 4000, dim: 50, transition: 300 };
       }
 
       // Sort by time for evaluation
-      const sorted = [...keyframes].sort((a, b) => parseTime(a.time) - parseTime(b.time));
+      const sorted = [...keyframes].sort((a, b) => kfMinutes(a) - kfMinutes(b));
       
       // Find relevant keyframes
       let prevKf = null;
       let nextKf = null;
 
       for (let i = 0; i < sorted.length; i++) {
-        const kfTime = parseTime(sorted[i].time);
+        const kfTime = kfMinutes(sorted[i]);
         
         if (kfTime <= timeMinutes) {
           prevKf = { ...sorted[i], timeMinutes: kfTime, index: i };
@@ -2630,10 +2885,10 @@ const translations = {
       // keyframes keep their index in `sorted` (used by the interpolate
       // branch to look at the keyframes around them).
       if (!prevKf) {
-        prevKf = { ...sorted[sorted.length - 1], timeMinutes: parseTime(sorted[sorted.length - 1].time) - 1440, index: sorted.length - 1 };
+        prevKf = { ...sorted[sorted.length - 1], timeMinutes: kfMinutes(sorted[sorted.length - 1]) - 1440, index: sorted.length - 1 };
       }
       if (!nextKf) {
-        nextKf = { ...sorted[0], timeMinutes: parseTime(sorted[0].time) + 1440, index: 0 };
+        nextKf = { ...sorted[0], timeMinutes: kfMinutes(sorted[0]) + 1440, index: 0 };
       }
 
       // A "before" transition of the NEXT keyframe starts ahead of its time
@@ -2750,7 +3005,7 @@ const translations = {
           
           if (prevIndex > 0) {
             const beforeKf = sorted[prevIndex - 1];
-            const beforeTime = parseTime(beforeKf.time);
+            const beforeTime = kfMinutes(beforeKf);
             
             startKelvin = beforeKf.kelvin;
             startDim = beforeKf.dim;
@@ -2823,7 +3078,7 @@ const translations = {
         
         for (let i = prevIndex + 1; i < sorted.length; i++) {
           const kf = sorted[i];
-          const kfTime = parseTime(kf.time);
+          const kfTime = kfMinutes(kf);
           
           if (kfTime >= nextInterpolateTime) break;
           
@@ -2918,7 +3173,7 @@ const translations = {
 
     /** Simulated output at wall-clock minutes of a given local day. */
     function simulateAt(dateStr, minutes) {
-      return evaluateSchedule(minutes, resolveKeyframes(dateStr));
+      return evaluateSchedule(minutes, resolveTimeline(dateStr));
     }
 
     /** Chart.js plugin: shades night and twilight behind the curves, from the
@@ -3515,12 +3770,13 @@ const translations = {
         const date = addDays(`${year}-01-01`, d);
         const keyframes = resolveKeyframes(date);
         keyframes.forEach(kf => { kfTimes[kf.sourceIndex][d] = parseTime(kf.time); });
+        const timeline = resolveTimeline(date);
         // Local midnight once per day; the rows add minutes to it (the one-hour
         // shift inside a DST day is irrelevant at this resolution).
         const midnight = loc ? KfAstro.localMidnightUtc(parseDate(date).y, parseDate(date).m, parseDate(date).d, loc.tz) : 0;
         for (let r = 0; r < YEAR_ROWS; r++) {
           const minute = r * YEAR_ROW_MINUTES + YEAR_ROW_MINUTES / 2;
-          const v = evaluateSchedule(minute, keyframes);
+          const v = evaluateSchedule(minute, timeline);
           dim[d * YEAR_ROWS + r] = v.dim;
           kelvin[d * YEAR_ROWS + r] = v.kelvin;
           daylight[d * YEAR_ROWS + r] = loc
@@ -4013,6 +4269,11 @@ const translations = {
             });
           }
           if (kf.group) out.group = kf.group;
+          if (hasValidOn(kf)) {
+            out.validOn = {};
+            if (kf.validDays.length < 7) out.validOn.weekdays = kf.validDays.slice();
+            if (kf.validFrom) Object.assign(out.validOn, { from: kf.validFrom, to: kf.validTo });
+          }
           return out;
         }),
         // Keyframe groups with their priority rule, see listGroups()
@@ -4112,6 +4373,8 @@ const translations = {
     };
     // Longest fade per PICO entry on DALI (extended fade time ends at 16 min)
     const PICO_DALI_MAX_FADE = 900;
+    // Above this size the export view warns (largest setup.json known to run: ~34 KB)
+    const PICO_SIZE_HINT_KB = 32;
     // Events the PICO lacks → a supported event plus offset. Solar midnight is
     // noon − 12 h (astro.js); golden hour gets the year's mean distance.
     const PICO_SUBSTITUTES = {
@@ -4128,6 +4391,42 @@ const translations = {
       s -= hours * 3600;
       const minutes = Math.floor(s / 60);
       return { hours: sign * hours || 0, minutes: sign * minutes || 0, seconds: sign * (s - minutes * 60) || 0 };
+    }
+
+    /**
+     * PICO `days` filters (combined with AND) for an entry that fires on the
+     * scanned day S and belongs to keyframe days S + delta: [{ kf, delta,
+     * negate }]. `negate` turns the keyframe's valid-on around ("not on its
+     * days") — only for a keyframe with a single component (weekdays or
+     * period), whose complement is again one filter. Keyframes valid every
+     * day add nothing; duplicates are dropped.
+     */
+    function picoDays(filters) {
+      const out = [];
+      const seen = new Set();
+      const add = f => {
+        const key = JSON.stringify(f);
+        if (!seen.has(key)) { seen.add(key); out.push(f); }
+      };
+      filters.forEach(({ kf, delta, negate }) => {
+        if (kf.validDays.length < 7) {
+          const f = { type: 'DAYS_OF_WEEK' };
+          WEEKDAYS.forEach((d, w) => { f[d] = kf.validDays.includes(WEEKDAYS[(((w + delta) % 7) + 7) % 7]) !== !!negate; });
+          add(f);
+        }
+        if (kf.validFrom) {
+          // Non-leap reference year: 29 Feb moves to 1 Mar when shifted
+          const md = (s, extra) => {
+            const x = new Date(Date.UTC(2001, +s.slice(0, 2) - 1, +s.slice(3) - delta + extra));
+            return { month: x.getUTCMonth() + 1, day: x.getUTCDate() };
+          };
+          // The complement of from–to is the day after `to` up to the day before `from`
+          add(negate
+            ? { type: 'DAYS_OF_YEAR', from: md(kf.validTo, 1), to: md(kf.validFrom, -1) }
+            : { type: 'DAYS_OF_YEAR', from: md(kf.validFrom, 0), to: md(kf.validTo, 0) });
+        }
+      });
+      return out;
     }
 
     function picoPoint(kf, fadeSeconds) {
@@ -4173,62 +4472,96 @@ const translations = {
         }
       });
 
-      // Predecessor of every keyframe per day (the keyframe before it in the
-      // day's order) and, for interpolate keyframes, the ramp length in
-      // minutes — as in analyzeHints()
+      // Firing minutes of keyframe i on day index d (relative to Jan 1 of the
+      // analysed year; days outside the year are resolved on demand)
+      const extraDays = new Map();
+      const firingOn = d => {
+        if (d >= 0 && d < days) return perDay[d];
+        if (!extraDays.has(d)) extraDays.set(d, resolveFiringMinutes(addDays(`${year}-01-01`, d)));
+        return extraDays.get(d);
+      };
+      const fires = (d, i) => firingOn(d)[i] != null;
+      const validAt = (i, d) => isValidOn(kfs[i], addDays(`${year}-01-01`, d));
+
+      // Predecessor of every keyframe per day: the keyframe before it on the
+      // timeline — on an earlier day if it is the day's first (resolveTimeline).
+      // Per keyframe and predecessor: the days (index of the keyframe's day),
+      // the day gap to the predecessor and the ramp length in minutes.
       const rampDelay = kf => (kf.mode === 'transition' && kf.transitionDirection !== 'before' ? kf.transitionSeconds / 60 : 0);
-      const preds = {};   // k → { pred → { days, min, max } }
-      let previousLast = null;
-      for (let d = -1; d < days; d++) {
+      const preds = {};   // k → { pred → { days: [d…], gaps: { gap: n }, min, max } }
+      let previousLast = null, previousDay = null;
+      for (let d = -8; d < days; d++) {
         const list = resolveKeyframes(addDays(`${year}-01-01`, d))
           .map(k => ({ i: k.sourceIndex, m: parseTime(k.time) }))
           .sort((a, b) => a.m - b.m);
         if (d >= 0) {
           list.forEach((k, pos) => {
-            const pred = pos > 0 ? list[pos - 1] : previousLast && { i: previousLast.i, m: previousLast.m - 1440 };
+            const gap = pos > 0 ? 0 : d - previousDay;
+            const pred = pos > 0 ? list[pos - 1] : previousLast;
             if (!pred) return;
             const byPred = preds[k.i] = preds[k.i] || {};
-            const r = byPred[pred.i] = byPred[pred.i] || { days: 0, min: Infinity, max: -Infinity };
-            const len = k.m - (pred.m + rampDelay(kfs[pred.i]));
-            r.days++;
+            const r = byPred[pred.i] = byPred[pred.i] || { days: [], gaps: {}, min: Infinity, max: -Infinity };
+            const len = k.m + 1440 * gap - (pred.m + rampDelay(kfs[pred.i]));
+            r.days.push(d);
+            r.gaps[gap] = (r.gaps[gap] || 0) + 1;
             r.min = Math.min(r.min, len);
             r.max = Math.max(r.max, len);
           });
         }
-        if (list.length) previousLast = list[list.length - 1];
+        if (list.length) { previousLast = list[list.length - 1]; previousDay = d; }
       }
+      const gapOf = r => +Object.entries(r.gaps).sort((a, b) => b[1] - a[1])[0][0];
+
       // Keyframes of a group with a priority rule share one PICO composite
       const groups = listGroups();
       const groupOf = i => {
         const g = kfs[i].group ? groups.find(x => x.id === kfs[i].group) : null;
         return g && g.rule !== 'all' && g.members.length > 1 ? g : null;
       };
-      const sameSlot = (a, b) => a === b || (groupOf(a) && groupOf(a) === groupOf(b));
       const slotMembers = i => (groupOf(i) ? groupOf(i).members : [i]);
       const ruleOf = i => (groupOf(i) ? groupOf(i).rule.toUpperCase() : null);
+      const slotKey = i => (groupOf(i) ? 'g' + groupOf(i).id : 'k' + i);
 
-      // The most frequent predecessor is the one exported. Members of one
-      // group count as the same predecessor — the composite picks the member.
-      const mainPred = {};
-      Object.keys(preds).forEach(k => {
-        const entries = Object.entries(preds[k]).map(([p, r]) => ({ pred: +p, ...r })).sort((a, b) => b.days - a.days);
-        mainPred[k] = entries[0];
-        const others = entries.filter(e => !sameSlot(e.pred, entries[0].pred)).reduce((n, e) => n + e.days, 0);
-        if (others && kfs[k].mode === 'interpolate') warnings.push({ type: 'pred', kf: +k, pred: entries[0].pred, days: others });
-      });
-      const ramping = i => {
-        const p = mainPred[i];
-        return kfs[i].mode === 'interpolate' && p && ['transition', 'interpolate'].includes(kfs[p.pred].mode);
+      /** Predecessor slots of keyframe k, most days first:
+          [{ key, lead, members, days: Set, gap, ramp }] */
+      const predSlots = k => {
+        const bySlot = new Map();
+        Object.entries(preds[k] || {}).forEach(([p, r]) => {
+          const key = slotKey(+p);
+          const s = bySlot.get(key) || { key, lead: +p, members: slotMembers(+p), days: new Set(), gaps: {} };
+          r.days.forEach(d => s.days.add(d));
+          Object.entries(r.gaps).forEach(([g, n]) => { s.gaps[g] = (s.gaps[g] || 0) + n; });
+          bySlot.set(key, s);
+        });
+        return [...bySlot.values()]
+          .map(s => ({ ...s, gap: gapOf(s), ramp: ['transition', 'interpolate'].includes(kfs[s.lead].mode) }))
+          .sort((a, b) => b.days.size - a.days.size);
       };
+      const mainPred = k => { const s = predSlots(k)[0]; return s ? s.lead : null; };
 
-      // Keyframe i's time with its bounds; shiftSeconds moves everything
-      const timeEntry = (i, shiftSeconds, point) => {
+      // Keyframe i's time with its bounds; shiftSeconds moves everything.
+      // Local times stay on their day even past midnight (−00:05, 24:10 —
+      // the PICO normalises them with mktime), so the `days` filter keeps
+      // meaning the keyframe's day. Only beyond the parser's ±24 h they wrap,
+      // and the filter moves along. filters: [{ kf, delta, negate }], see picoDays().
+      const LOCAL_LIMIT = 24 * 3600 + 59 * 60 + 59;
+      const timeEntry = (i, shiftSeconds, point, filters) => {
         const kf = kfs[i];
-        const local = minutes => {
-          const s = ((Math.round(minutes * 60 + shiftSeconds) % 86400) + 86400) % 86400;
+        let wrapDays = 0;
+        const local = (minutes, main) => {
+          let s = Math.round(minutes * 60 + shiftSeconds);
+          if (Math.abs(s) > LOCAL_LIMIT) {
+            const k = Math.floor(s / 86400);
+            s -= k * 86400;
+            if (main) wrapDays = k;
+          }
           return { type: 'LOCALTIME', ...picoOffset(s), point };
         };
-        if (kf.trigger !== 'sun') return local(parseTime(kf.time));
+        const withDays = entry => {
+          const days = picoDays(filters.map(f => ({ ...f, kf: kfs[f.kf], delta: f.delta - wrapDays })));
+          return days.length ? { ...entry, days } : entry;
+        };
+        if (kf.trigger !== 'sun') return withDays(local(parseTime(kf.time), true));
         const sub = subst[kf.sunEvent];
         const event = sub ? sub.base : kf.sunEvent;
         let entry = {
@@ -4242,7 +4575,7 @@ const translations = {
         const hi = kf.notAfter ? local(parseTime(kf.notAfter)) : null;
         const order = KfAstro.EVENTS[kf.sunEvent].rising ? [['LATEST', lo], ['EARLIEST', hi]] : [['EARLIEST', hi], ['LATEST', lo]];
         order.forEach(([type, bound]) => { if (bound) entry = { type, entries: [entry, bound] }; });
-        return entry;
+        return withDays(entry);
       };
 
       // Where a ramp towards the next keyframe starts after keyframe m (+1 s
@@ -4286,38 +4619,88 @@ const translations = {
         });
       };
 
+      // Does member x's entry fire on scanned day S (as far as the PICO's
+      // filters and our resolution tell)?
+      const holds = (f, S) => validAt(f.kf, S + f.delta) !== !!f.negate;
+      const memberOn = (x, S) => fires(S, x.m) && x.filters.every(f => holds(f, S));
+
       // A slot is what the PICO does for one keyframe: entries anchored at
-      // the keyframe itself, its group, or (for a ramp) its predecessor or
-      // the predecessor's group. Per anchoring member: start shift, fade
-      // length, start value.  { rule, members: [{ m, to, from, shift, seconds }] }
+      // the keyframe itself, its group, or (for a ramp) a predecessor or the
+      // predecessor's group. Per anchoring member: start shift, fade length,
+      // start value, day filters.
+      //   { rule, members: [{ m, to, from, shift, seconds, filters }] }
       const valueOf = i => ({ dim: kfs[i].dim, kelvin: kfs[i].kelvin });
-      const fromOf = i => valueOf(mainPred[i] ? mainPred[i].pred : i);
-      const slotFor = i => {
-        if (ramping(i)) {
-          const p = mainPred[i];
-          // Each member of the predecessor's group gets the ramp length of
-          // the days it wins; the fade can only be fixed per member.
-          const rampOf = m => (preds[i][m] && sameSlot(m, p.pred) ? preds[i][m] : p);
-          const spread = [...new Set(slotMembers(p.pred).map(rampOf))]
-            .reduce((w, r) => (r.max - r.min > w.max - w.min ? r : w));
-          if (spread.max - spread.min > 1) warnings.push({ type: 'fade', kf: i, min: spread.min, max: spread.max });
+      const ownSlot = i => ({
+        rule: ruleOf(i),
+        members: slotMembers(i).map(m => {
+          const p = mainPred(m);
           return {
-            rule: ruleOf(p.pred),
-            members: slotMembers(p.pred).map(m => ({
-              m, to: i, from: valueOf(m), shift: rampShift(m),
+            m, to: m, from: valueOf(p == null ? m : p), shift: ownShift(m), filters: [{ kf: m, delta: 0 }],
+            seconds: kfs[m].mode === 'transition' ? kfs[m].transitionSeconds : 0
+          };
+        })
+      });
+
+      /**
+       * Ramps of interpolate keyframe k: one slot per predecessor that ramps
+       * (transition / interpolate). The days of each must be expressible as
+       * PICO filters: the predecessor's and k's own valid-on, if needed with
+       * the other predecessors' valid-on negated (one weekday set or one
+       * period each). A candidate is kept only if it hits exactly the
+       * predecessor's days of the year; the most frequent one is kept anyway.
+       * Returns { slots, uncovered, needOwn }.
+       */
+      const rampSlots = k => {
+        const all = predSlots(k);
+        const negatable = i => (kfs[i].validDays.length < 7) !== !!kfs[i].validFrom;
+        const slots = [];
+        let uncovered = 0, needOwn = false;
+        all.forEach((P, index) => {
+          if (!P.ramp) { needOwn = true; return; }
+          // From a predecessor with the same values there is nothing to fade
+          const flat = P.members.every(m => kfs[m].dim === kfs[k].dim && kfs[m].kelvin === kfs[k].kelvin);
+          if (flat) return;
+          const base = m => [{ kf: m, delta: 0 }, { kf: k, delta: P.gap }];
+          const negations = all
+            .filter(Q => Q !== P && Q.members.every(negatable))
+            .flatMap(Q => Q.members.map(q => ({ kf: q, delta: P.gap - Q.gap, negate: true })));
+          const covered = filtersFor => {
+            const hit = new Set();
+            for (let d = 0; d < days; d++) {
+              if (!fires(d, k)) continue;
+              const S = d - P.gap;
+              if (P.members.some(m => memberOn({ m, filters: filtersFor(m) }, S))) hit.add(d);
+            }
+            return hit;
+          };
+          // Days where the candidate and the simulation disagree
+          const mismatch = hit => [...hit].filter(d => !P.days.has(d)).length + [...P.days].filter(d => !hit.has(d)).length;
+          const withNegations = m => base(m).concat(negations);
+          let filtersFor = null;
+          const baseMiss = mismatch(covered(base));
+          if (!baseMiss) filtersFor = base;
+          else if (negations.length && !mismatch(covered(withNegations))) filtersFor = withNegations;
+          else if (index === 0) {   // best effort for the main predecessor, reported
+            filtersFor = base;
+            uncovered += baseMiss;
+            needOwn = true;
+          }
+          if (!filtersFor) { uncovered += P.days.size; needOwn = true; return; }
+
+          // Ramp length per member: shortest of the days it is the predecessor
+          const rampOf = m => (preds[k][m] || preds[k][P.lead]);
+          const spread = [...new Set(P.members.map(rampOf))]
+            .reduce((w, r) => (r.max - r.min > w.max - w.min ? r : w));
+          if (spread.max - spread.min > 1) warnings.push({ type: 'fade', kf: k, min: spread.min, max: spread.max });
+          slots.push({
+            rule: ruleOf(P.lead),
+            members: P.members.map(m => ({
+              m, to: k, from: valueOf(m), shift: rampShift(m), filters: filtersFor(m),
               seconds: Math.max(0, (rampOf(m).min + rampDelay(kfs[m])) * 60 - rampShift(m))
             }))
-          };
-        }
-        // A group member that ramps cannot share the group's anchor — it is
-        // exported like an instant keyframe (reported as 'group' below)
-        return {
-          rule: ruleOf(i),
-          members: slotMembers(i).map(m => ({
-            m, to: m, from: fromOf(m), shift: ownShift(m),
-            seconds: kfs[m].mode === 'transition' ? kfs[m].transitionSeconds : 0
-          }))
-        };
+          });
+        });
+        return { slots, uncovered, needOwn };
       };
 
       const entries = [];
@@ -4336,40 +4719,47 @@ const translations = {
             const e = kf.curve === 'sinus' ? easeSinus(p) : p;
             return picoPoint({ dim: lerp(x.from.dim, kf.dim, e), kelvin: lerp(x.from.kelvin, kf.kelvin, e) }, busFade(piece.length));
           };
-          const jsons = slot.members.map((x, k) => timeEntry(x.m, x.shift + parts[k][j].start, point(x, parts[k][j])));
+          const jsons = slot.members.map((x, k) => timeEntry(x.m, x.shift + parts[k][j].start, point(x, parts[k][j]), x.filters));
           entries.push({
             json: slot.rule ? { type: slot.rule, entries: jsons } : jsons[0],
+            // Time on scanned day d of the member that fires there
             timeOn: d => {
-              const k = slot.members.findIndex(x => perDay[d][x.m] != null);
+              const k = slot.members.findIndex(x => memberOn(x, d));
               return k < 0 ? null : perDay[d][slot.members[k].m] + (slot.members[k].shift + parts[k][j].start) / 60;
-            },
-            timeOnly: slot.members.every(x => kfs[x.m].trigger !== 'sun')
+            }
           });
         }
       };
 
-      // One slot per keyframe; a group with a priority rule is one slot
+      // One slot per keyframe (a group with a priority rule is one slot);
+      // interpolate keyframes get their ramps, plus their own entry where a
+      // ramp is missing (instant predecessor, or days no filter can express)
       const doneGroups = new Set();
       kfs.forEach((kf, i) => {
         const g = groupOf(i);
         if (g) {
           if (doneGroups.has(g.id)) return;
           doneGroups.add(g.id);
-          const shifts = new Set(g.members.map(m => (ramping(m) ? 'ramp' : ownShift(m))));
+          // A member that interpolates cannot share the group's anchor — it
+          // is exported like an instant keyframe
+          const shifts = new Set(g.members.map(m => (kfs[m].mode === 'interpolate' ? 'ramp' : ownShift(m))));
           if (shifts.size > 1) warnings.push({ type: 'group', group: g.id });
+          emit(ownSlot(i));
+          return;
         }
-        emit(slotFor(i));
+        if (kf.mode !== 'interpolate') { emit(ownSlot(i)); return; }
+        const { slots, uncovered, needOwn } = rampSlots(i);
+        slots.forEach(emit);
+        if (needOwn || !slots.length) emit(ownSlot(i));
+        if (uncovered) warnings.push({ type: 'pred', kf: i, days: uncovered });
       });
       if (linear.size) warnings.push({ type: 'linear', kfs: [...linear].sort((a, b) => a - b) });
 
       // The PICO expects each day's entries in chronological order. Sort by
       // the median time of the year and report the days that break it.
-      // Local times wrap into the day like the PICO does; sun entries may run
-      // past midnight (their timestamp does, too).
-      const dayTime = (e, d) => {
-        const v = e.timeOn(d);
-        return v == null ? null : e.timeOnly ? ((v % 1440) + 1440) % 1440 : v;
-      };
+      // Times may run past midnight (−00:05, 24:10) — so do the PICO's
+      // timestamps of that day.
+      const dayTime = (e, d) => e.timeOn(d);
       entries.forEach(e => {
         const values = [];
         for (let d = 0; d < days; d++) { const v = dayTime(e, d); if (v != null) values.push(v); }
@@ -4405,7 +4795,7 @@ const translations = {
           return t('pico_warn_fade').replace('{k}', num(w.kf))
             .replace(/\{min\}/g, formatDuration(w.min)).replace('{max}', formatDuration(w.max));
         case 'pred':
-          return t('pico_warn_pred').replace('{k}', num(w.kf)).replace('{p}', num(w.pred)).replace('{n}', w.days);
+          return t('pico_warn_pred').replace(/\{k\}/g, num(w.kf)).replace('{n}', w.days);
         case 'substitute': {
           const m = Math.round(w.seconds / 60);
           return t('pico_warn_substitute').replace('{k}', num(w.kf))
@@ -4440,6 +4830,9 @@ const translations = {
         .replace('{n}', result.entryCount)
         .replace('{kb}', (new Blob([text]).size / 1024).toFixed(1));
       const warnings = result.warnings.map(picoWarningText).filter(Boolean);
+      // The largest setup.json known to run on a PICO is about 34 KB
+      const kb = new Blob([text]).size / 1024;
+      if (kb > PICO_SIZE_HINT_KB) warnings.unshift(t('pico_warn_size').replace('{kb}', kb.toFixed(0)));
       document.getElementById('picoNotes').innerHTML = `
         <p class="lkl-body-sm">${intro}</p>
         <p class="lkl-body-sm">${size}</p>
@@ -4563,6 +4956,7 @@ const translations = {
         
         return [
           pdfText(describeTrigger(kf)),
+          pdfText(validSummary(kf) || t('valid_daily')),
           `${kf.dim}%`,
           `${kf.kelvin}K`,
           kf.mode === 'instant' ? t('mode_instant') : kf.mode === 'transition' ? t('mode_transition') : t('mode_interpolate'),
@@ -4573,7 +4967,7 @@ const translations = {
       
       doc.autoTable({
         startY: yPos,
-        head: [[t('pdf_time'), t('pdf_brightness'), t('pdf_kelvin'), t('pdf_mode'), t('pdf_transition'), t('pdf_curve')]],
+        head: [[t('pdf_time'), t('th_valid'), t('pdf_brightness'), t('pdf_kelvin'), t('pdf_mode'), t('pdf_transition'), t('pdf_curve')]],
         body: tableData,
         margin: { left: margin, right: margin },
         styles: { fontSize: 9, cellPadding: 2 },

@@ -14,6 +14,7 @@ Defines keyframes — cada uno con un disparador, brillo y temperatura de color.
 
 - **Disparadores:** una hora fija o un evento solar en la ubicación (crepúsculos, salida del sol, mediodía solar, hora dorada, puesta del sol, medianoche solar) con un desfase en minutos y límites opcionales *no antes de / no después de*.
 - **Grupos:** los keyframes con la misma función (p. ej. «puesta del sol» y «20:00») se pueden agrupar; cada día solo se aplica el primero, el último o todos.
+- **Válido en:** un keyframe se puede limitar a días de la semana y/o a un periodo del año (p. ej. Lu–Vi, 01.11.–28.02.), como *valid on* en el PICO. Un día sin keyframes mantiene el último valor; a medianoche cuenta el día anterior real.
 - **Una instancia = un horario** para cualquier número de luces. Otra instancia solo hace falta para un horario distinto.
 
 ---
