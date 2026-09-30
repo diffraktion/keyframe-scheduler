@@ -266,6 +266,16 @@ class ValidOnTest(unittest.TestCase):
         self.assertEqual(dim_at(ev, self.MON, "06:00"), 20)
         self.assertEqual(dim_at(ev, self.MON, "08:00"), 100)
 
+    def test_half_year_pause_holds_the_last_value(self):
+        # Winter half-year only: in summer the value of 31 March holds
+        spec = spec_from_dict(schedule([
+            kf("07:00", 4000, 100, "instant", validOn={"from": "10-01", "to": "03-31"}),
+            kf("18:00", 2700, 20, "instant", validOn={"from": "10-01", "to": "03-31"}),
+        ]))
+        ev = Evaluator(spec)
+        self.assertEqual(dim_at(ev, date(2026, 6, 15), "12:00"), 20)
+        self.assertEqual(dim_at(ev, date(2026, 10, 1), "08:00"), 100)
+
     def test_midnight_uses_the_real_previous_day(self):
         # Sunday evening differs from the other evenings: Monday 02:00 must
         # show Sunday's value, not Monday's own last keyframe

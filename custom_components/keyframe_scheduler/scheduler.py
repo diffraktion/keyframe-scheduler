@@ -106,6 +106,10 @@ class Keyframe:
 
 
 GROUP_IDS = ("A", "B", "C", "D", "E", "F", "G", "H")
+
+# How far Evaluator.timeline_for looks for the neighbouring days with
+# keyframes: a year, so even a half-year pause (valid-on) holds its value.
+TIMELINE_SEARCH_DAYS = 366
 GROUP_RULES = ("earliest", "latest", "all")
 
 
@@ -400,6 +404,8 @@ class Evaluator:
         cached = self._timeline_cache.get(day)
         if cached is not None:
             return cached
+        if not self.spec.keyframes:
+            return ()
 
         def shifted(k: int) -> List[Keyframe]:
             return [
@@ -408,13 +414,13 @@ class Evaluator:
             ]
 
         result: List[Keyframe] = []
-        for k in range(-1, -8, -1):
+        for k in range(-1, -TIMELINE_SEARCH_DAYS - 1, -1):
             earlier = shifted(k)
             if earlier:
                 result.extend(earlier)
                 break
         result.extend(shifted(0))
-        for k in range(1, 8):
+        for k in range(1, TIMELINE_SEARCH_DAYS + 1):
             later = shifted(k)
             if later:
                 result.extend(later)

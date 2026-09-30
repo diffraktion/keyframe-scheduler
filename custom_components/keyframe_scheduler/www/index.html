@@ -1034,40 +1034,74 @@
      *                 depending on the day (interpolate = "from the previous")
      *   overnight   — an interpolate keyframe ramps across midnight from the
      *                 previous evening, i.e. the whole night changes
+     * Plausibility of valid-on filters:
+     *   emptyDays   — days on which no keyframe fires: the last value stays
+     *                 on (weekends, periods); with the longest such hold
+     *   multiDay    — an interpolate keyframe ramps over more than a day
+     *                 because the days in between have no keyframes
+     *   never       — a keyframe that fires on no day of the year
+     *   periodAll   — a period that covers the whole year
      */
     function analyzeHints() {
       const year = parseDate(viewDate).y;
       if (hintCache && hintCache.year === year) return hintCache.hints;
 
+      const kfs = state.keyframes;
       const hints = [];
       listGroups().forEach(g => {
-        const modes = [...new Set(g.members.map(i => state.keyframes[i].mode))];
+        const modes = [...new Set(g.members.map(i => kfs[i].mode))];
         if (modes.length > 1) hints.push({ type: 'mixedModes', group: g.id, modes });
       });
 
       const days = daysInYear(year);
+      const dateOf = d => addDays(`${year}-01-01`, d);
+      const listOf = d => resolveKeyframes(dateOf(d))
+        .map(k => ({ i: k.sourceIndex, m: parseTime(k.time), mode: k.mode }))
+        .sort((a, b) => a.m - b.m);
       const preds = {};      // interpolate index → { predecessor index → days }
       const overnight = {};  // interpolate index → { days, example }
+      const multiDay = {};   // interpolate index → { days, example }
+      const firing = kfs.map(() => 0);
+      const emptyDays = [];
+      const holds = [];      // runs of days without keyframes: { from, to, days }
+      let run = null;
+      // The keyframe before, with its day: { i, m, mode, d }. Starts a week
+      // early so January can refer back into December.
       let previousLast = null;
-      for (let d = -1; d < days; d++) {
-        const date = addDays(`${year}-01-01`, d);
-        const list = resolveKeyframes(date)
-          .map(k => ({ i: k.sourceIndex, m: parseTime(k.time), mode: k.mode }))
-          .sort((a, b) => a.m - b.m);
+      for (let d = -8; d < days; d++) {
+        const list = listOf(d);
         if (d >= 0) {
+          list.forEach(k => { firing[k.i]++; });
+          if (!list.length) {
+            emptyDays.push(d);
+            if (!run) holds.push(run = { from: previousLast, to: null, days: [] });
+            run.days.push(d);
+          } else if (run) {
+            run.to = { ...list[0], d };
+            run = null;
+          }
           list.forEach((k, pos) => {
             if (k.mode !== 'interpolate') return;
-            const pred = pos > 0 ? list[pos - 1] : previousLast;
+            const pred = pos > 0 ? { ...list[pos - 1], d } : previousLast;
             if (!pred) return;
             (preds[k.i] = preds[k.i] || {})[pred.i] = (preds[k.i][pred.i] || 0) + 1;
-            if (pos === 0 && pred.m > k.m) {
-              const o = overnight[k.i] = overnight[k.i] || { days: 0, example: null };
-              o.days++;
-              if (!o.example) o.example = { from: pred.m, to: k.m, date };
-            }
+            if (pos > 0) return;
+            const example = { from: pred, to: { ...k, d }, hours: ((d - pred.d) * 1440 + k.m - pred.m) / 60 };
+            const target = d - pred.d > 1 ? multiDay : pred.m > k.m ? overnight : null;
+            if (!target) return;
+            const o = target[k.i] = target[k.i] || { days: 0, example: null };
+            o.days++;
+            if (!o.example || example.hours > o.example.hours) o.example = example;
           });
         }
-        previousLast = list.length ? list[list.length - 1] : previousLast;
+        if (list.length) previousLast = { ...list[list.length - 1], d };
+      }
+      // A hold that is still running at the end of the year ends in January
+      if (run) {
+        for (let d = days; d < days + 8 && !run.to; d++) {
+          const list = listOf(d);
+          if (list.length) run.to = { ...list[0], d };
+        }
       }
 
       // A changing predecessor that an open conflict already explains (the
@@ -1085,8 +1119,46 @@
           hints.push({ type: 'predecessor', kf: k, preds: entries.sort((a, b) => b.days - a.days) });
         }
       });
-      Object.keys(overnight).forEach(i => {
-        hints.push({ type: 'overnight', kf: +i, ...overnight[i] });
+      Object.keys(overnight).forEach(i => hints.push({ type: 'overnight', kf: +i, ...overnight[i] }));
+      Object.keys(multiDay).forEach(i => hints.push({ type: 'multiDay', kf: +i, ...multiDay[i] }));
+
+      // Days without any keyframe: weekdays that are always empty are named
+      // as such ("every Sat, Sun"), the rest as date ranges
+      if (emptyDays.length && kfs.length) {
+        const empty = new Set(emptyDays);
+        const weekdayOf = d => (new Date(Date.UTC(year, 0, 1 + d)).getUTCDay() + 6) % 7;
+        const allDays = Array.from({ length: days }, (_, d) => d);
+        const weekdays = WEEKDAYS.map((_, w) => w)
+          .filter(w => allDays.filter(d => weekdayOf(d) === w).every(d => empty.has(d)));
+        const rest = emptyDays.filter(d => !weekdays.includes(weekdayOf(d)));
+        const longest = holds
+          .filter(h => h.from && h.to)
+          .map(h => ({ ...h, hours: ((h.to.d - h.from.d) * 1440 + h.to.m - h.from.m) / 60 }))
+          .sort((a, b) => b.hours - a.hours)[0] || null;
+        const held = longest ? simulateAt(dateOf(longest.days[0]), 720) : null;
+        // An interpolation towards the keyframe after the pause keeps running
+        // through it (see multiDay) — then nothing is "held"
+        const ramp = !!longest && kfs[longest.to.i].mode === 'interpolate' &&
+          ['transition', 'interpolate'].includes(kfs[longest.from.i].mode);
+        hints.push({ type: 'emptyDays', count: emptyDays.length, weekdays, rest, year, longest, held, ramp });
+      }
+
+      kfs.forEach((kf, i) => {
+        if (firing[i]) return;
+        let validDays = 0;
+        for (let d = 0; d < days; d++) if (isValidOn(kf, dateOf(d))) validDays++;
+        const reason = !validDays ? 'valid' : kf.group ? 'group' : 'sun';
+        hints.push({ type: 'never', kf: i, reason, year });
+      });
+
+      kfs.forEach((kf, i) => {
+        if (!kf.validFrom) return;
+        // The whole year: the day after `to` is `from` (leap year for 29 Feb)
+        const next = new Date(Date.UTC(2000, +kf.validTo.slice(0, 2) - 1, +kf.validTo.slice(3) + 1));
+        const nextMd = `${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
+        if (nextMd === kf.validFrom || (kf.validFrom === '01-01' && kf.validTo === '12-31')) {
+          hints.push({ type: 'periodAll', kf: i });
+        }
       });
 
       hintCache = { year, hints };
@@ -1338,6 +1410,18 @@ const translations = {
     hint_mixed_modes: "{g} mischt Modi ({modes}). Je nachdem, welcher Keyframe gewinnt, ändert sich der Verlauf davor und danach – am besten allen Mitgliedern denselben Modus geben.",
     hint_predecessor: "{k} (Interpolate) startet je nach Tag bei einem anderen Keyframe: {list}. Der Verlauf vor {k} ändert sich deshalb im Jahresverlauf.",
     hint_overnight: "{k} (Interpolate) interpoliert an {n} Tagen über Mitternacht, z. B. {from} → {to} am {date} – die ganze Nacht ändert sich. Soll die Nacht konstant bleiben, {k} auf Transition stellen.",
+    hint_every: "jeden",
+    hint_empty_days: "An {n} Tagen feuert kein Keyframe ({when}) – dort bleibt der letzte Wert aktiv.",
+    hint_empty_longest: "Längste Pause: {from} → {to} ({hours}, es bleiben {value}). Ist das so gewollt, passt es; sonst für diese Tage einen Keyframe anlegen oder die Gültigkeit erweitern.",
+    hint_empty_longest_ramp: "Längste Pause: {from} → {to} ({hours}); in dieser Zeit läuft die Interpolation zu {k} weiter.",
+    hint_empty_pico: "Achtung PICO: er sucht nur {max} Tage zurück – eine längere Pause überbrückt er nicht (siehe PICO-Export).",
+    hint_multi_day: "{k} (Interpolate) interpoliert an {n} Tagen über mehr als einen Tag, weil dazwischen kein Keyframe gilt, z. B. {from} → {to} ({hours}). Soll der Wert bis dahin stehen bleiben, {k} auf Transition stellen oder einen Keyframe für die Tage dazwischen anlegen.",
+    hint_never_valid: "{k} gilt {year} an keinem Tag (Gültig: {valid}) – Wochentage und Zeitraum schließen sich aus.",
+    hint_never_group: "{k} feuert {year} an keinem Tag: in {g} gewinnt immer ein anderes Mitglied (Gültig: {valid}).",
+    hint_never_sun: "{k} feuert {year} an keinem Tag: das Sonnenereignis tritt an den gültigen Tagen nicht ein und es gibt keine Früh-/Spätgrenze (Gültig: {valid}).",
+    hint_period_all: "{k}: Der Zeitraum ({valid}) umfasst das ganze Jahr und kann entfallen.",
+    day_no_keyframes: "Kein Keyframe an diesem Tag",
+    day_hold_since: " – es gilt weiter {k} vom {date} {time}",
     pico_export: "PICO DailyScheduler",
     pico_summary: "PICO-DailyScheduler anzeigen",
     pico_intro: "Behavior-Block für das setup.json eines PICO lightnode – in die <code>behaviors</code> eines Targets mit Space <code>TC</code> einfügen. Sonnenzeiten rechnet der PICO mit Koordinaten und Zeitzone aus seiner eigenen Konfiguration (<code>pico.latitude</code> / <code>pico.longitude</code>) – für diesen Plan: {lat}, {lon}.",
@@ -1350,6 +1434,8 @@ const translations = {
     pico_warn_substitute: "{k}: „{event}“ kennt der PICO nicht – exportiert als „{base}“ {offset} (Abweichung bis {dev} min).",
     pico_warn_group: "{g}: Die Mitglieder beginnen unterschiedlich früh (Transition davor / Interpolation). Der PICO vergleicht die Startzeiten, nicht die Keyframe-Zeiten – der Gewinner kann abweichen.",
     pico_warn_order: "Die Reihenfolge der Einträge wechselt an {n} Tagen ({ranges}). Der PICO verlangt pro Tag eine chronologische Reihenfolge – Konflikte gruppieren.",
+    pico_warn_multi_day: "{k}: An {n} Tagen interpoliert die Simulation über mehrere Tage (bis {hours} h, z. B. übers Wochenende). Der PICO bildet das nicht nach – so lange Rampen bräuchten Hunderte Einträge – und setzt {k} zu seiner Zeit.",
+    pico_warn_lookaround: "An {n} Tagen ({ranges}) liegt der letzte Eintrag mehr als {max} Tage zurück. Der PICO sucht nur {max} Tage zurück und verliert dort den Wert (er nimmt den Eingangswert des Behaviors, meist aus) – mindestens alle {max} Tage einen Keyframe gelten lassen.",
     pico_warn_size: "Der Block ist {kb} KB groß – größer als die bisher erprobten PICO-Setups (ca. 34 KB inkl. Targets). Vor dem Einsatz auf dem PICO testen; lange Interpolationen, besonders über Nacht, sparen am meisten ein.",
     pico_bus: "Ausgang",
     pico_bus_dali: "DALI – Fades bis 15 min",
@@ -1598,6 +1684,18 @@ const translations = {
     hint_mixed_modes: "{g} mixes modes ({modes}). Depending on which keyframe wins, the curve before and after it changes – ideally give all members the same mode.",
     hint_predecessor: "{k} (Interpolate) starts from a different keyframe depending on the day: {list}. The curve before {k} therefore changes over the year.",
     hint_overnight: "{k} (Interpolate) interpolates across midnight on {n} days, e.g. {from} → {to} on {date} – the whole night changes. To keep the night constant, set {k} to Transition.",
+    hint_every: "every",
+    hint_empty_days: "On {n} days no keyframe fires ({when}) – the last value stays on there.",
+    hint_empty_longest: "Longest gap: {from} → {to} ({hours}, holding {value}). Fine if intended; otherwise add a keyframe for these days or widen the validity.",
+    hint_empty_longest_ramp: "Longest gap: {from} → {to} ({hours}); the interpolation towards {k} keeps running during it.",
+    hint_empty_pico: "Note for the PICO: it only looks {max} days back – it cannot bridge a longer gap (see PICO export).",
+    hint_multi_day: "{k} (Interpolate) interpolates over more than a day on {n} days because no keyframe applies in between, e.g. {from} → {to} ({hours}). To hold the value until then, set {k} to Transition or add a keyframe for the days in between.",
+    hint_never_valid: "{k} applies on no day of {year} (Valid: {valid}) – weekdays and period exclude each other.",
+    hint_never_group: "{k} fires on no day of {year}: another member of {g} always wins (Valid: {valid}).",
+    hint_never_sun: "{k} fires on no day of {year}: the sun event does not happen on its valid days and there is no not-before/not-after bound (Valid: {valid}).",
+    hint_period_all: "{k}: the period ({valid}) covers the whole year and can be removed.",
+    day_no_keyframes: "No keyframe on this day",
+    day_hold_since: " – {k} of {date} {time} still applies",
     pico_export: "PICO DailyScheduler",
     pico_summary: "Show PICO DailyScheduler",
     pico_intro: "Behavior block for a PICO lightnode setup.json – paste it into the <code>behaviors</code> of a target with space <code>TC</code>. The PICO computes sun times from the coordinates and time zone of its own configuration (<code>pico.latitude</code> / <code>pico.longitude</code>) – for this schedule: {lat}, {lon}.",
@@ -1610,6 +1708,8 @@ const translations = {
     pico_warn_substitute: "{k}: the PICO has no \"{event}\" – exported as \"{base}\" {offset} (up to {dev} min off).",
     pico_warn_group: "{g}: the members start at different lead times (transition before / interpolation). The PICO compares start times, not keyframe times – the winner may differ.",
     pico_warn_order: "The order of the entries changes on {n} days ({ranges}). The PICO needs each day's entries in chronological order – group the conflicts.",
+    pico_warn_multi_day: "{k}: on {n} days the simulation interpolates over several days (up to {hours} h, e.g. across the weekend). The PICO does not reproduce this – ramps that long would take hundreds of entries – and sets {k} at its time.",
+    pico_warn_lookaround: "On {n} days ({ranges}) the last entry is more than {max} days back. The PICO only looks {max} days back and loses the value there (it takes the behavior's input, usually off) – let a keyframe apply at least every {max} days.",
     pico_warn_size: "The block is {kb} KB – larger than the PICO setups tried so far (about 34 KB including targets). Test it on the PICO first; long interpolations, especially overnight, save the most.",
     pico_bus: "Output",
     pico_bus_dali: "DALI – fades up to 15 min",
@@ -1858,6 +1958,18 @@ const translations = {
     hint_mixed_modes: "{g} mezcla modos ({modes}). Según qué keyframe gane, cambia la curva antes y después – mejor dar a todos los miembros el mismo modo.",
     hint_predecessor: "{k} (Interpolar) empieza desde un keyframe distinto según el día: {list}. Por eso la curva antes de {k} cambia a lo largo del año.",
     hint_overnight: "{k} (Interpolar) interpola a través de la medianoche durante {n} días, p. ej. {from} → {to} el {date} – cambia toda la noche. Para mantener la noche constante, pon {k} en Transición.",
+    hint_every: "cada",
+    hint_empty_days: "Durante {n} días no se dispara ningún keyframe ({when}) – allí sigue activo el último valor.",
+    hint_empty_longest: "Pausa más larga: {from} → {to} ({hours}, se mantienen {value}). Si es intencionado, está bien; si no, añade un keyframe para esos días o amplía la validez.",
+    hint_empty_longest_ramp: "Pausa más larga: {from} → {to} ({hours}); durante ese tiempo sigue la interpolación hacia {k}.",
+    hint_empty_pico: "Atención PICO: solo busca {max} días hacia atrás – no puede salvar una pausa más larga (ver exportación PICO).",
+    hint_multi_day: "{k} (Interpolar) interpola durante {n} días a lo largo de más de un día porque entre medias no se aplica ningún keyframe, p. ej. {from} → {to} ({hours}). Para mantener el valor hasta entonces, pon {k} en Transición o añade un keyframe para los días intermedios.",
+    hint_never_valid: "{k} no se aplica ningún día de {year} (Válido: {valid}) – los días de la semana y el periodo se excluyen.",
+    hint_never_group: "{k} no se dispara ningún día de {year}: en {g} siempre gana otro miembro (Válido: {valid}).",
+    hint_never_sun: "{k} no se dispara ningún día de {year}: el evento solar no ocurre en sus días válidos y no hay límite (Válido: {valid}).",
+    hint_period_all: "{k}: el periodo ({valid}) abarca todo el año y se puede quitar.",
+    day_no_keyframes: "Ningún keyframe este día",
+    day_hold_since: " – sigue vigente {k} del {date} {time}",
     pico_export: "PICO DailyScheduler",
     pico_summary: "Mostrar DailyScheduler PICO",
     pico_intro: "Bloque behavior para el setup.json de un PICO lightnode – pégalo en los <code>behaviors</code> de un target con space <code>TC</code>. El PICO calcula las horas solares con las coordenadas y la zona horaria de su propia configuración (<code>pico.latitude</code> / <code>pico.longitude</code>) – para este plan: {lat}, {lon}.",
@@ -1870,6 +1982,8 @@ const translations = {
     pico_warn_substitute: "{k}: el PICO no conoce «{event}» – se exporta como «{base}» {offset} (desviación hasta {dev} min).",
     pico_warn_group: "{g}: los miembros empiezan con distinta antelación (transición antes / interpolación). El PICO compara las horas de inicio, no las de los keyframes – el ganador puede variar.",
     pico_warn_order: "El orden de las entradas cambia durante {n} días ({ranges}). El PICO necesita las entradas de cada día en orden cronológico – agrupa los conflictos.",
+    pico_warn_multi_day: "{k}: durante {n} días la simulación interpola a lo largo de varios días (hasta {hours} h, p. ej. el fin de semana). El PICO no lo reproduce – rampas tan largas necesitarían cientos de entradas – y fija {k} a su hora.",
+    pico_warn_lookaround: "Durante {n} días ({ranges}) la última entrada queda a más de {max} días. El PICO solo busca {max} días hacia atrás y allí pierde el valor (toma la entrada del behavior, normalmente apagado) – deja que un keyframe se aplique al menos cada {max} días.",
     pico_warn_size: "El bloque ocupa {kb} KB – más que los setups PICO probados hasta ahora (unos 34 KB con targets). Pruébalo antes en el PICO; las interpolaciones largas, sobre todo nocturnas, son las que más ocupan.",
     pico_bus: "Salida",
     pico_bus_dali: "DALI – fundidos hasta 15 min",
@@ -2475,7 +2589,7 @@ const translations = {
       const el = document.getElementById('conflictsContainer');
       const groups = listGroups();
       const pairs = state.keyframes.length > 1 ? analyzeConflicts() : [];
-      const hints = state.keyframes.length > 1 ? analyzeHints() : [];
+      const hints = state.keyframes.length ? analyzeHints() : [];
       if (!groups.length && !pairs.length && !hints.length) { el.innerHTML = ''; return; }
 
       const year = parseDate(viewDate).y;
@@ -2501,12 +2615,59 @@ const translations = {
               .replace(/\{k\}/g, `<strong>${num(h.kf)}</strong>`)
               .replace('{list}', h.preds.map(p => `${num(p.pred)} (${p.days} ${t('days_short')})`).join(', '));
           }
-          return t('hint_overnight')
-            .replace(/\{k\}/g, `<strong>${num(h.kf)}</strong>`)
-            .replace('{n}', h.days)
-            .replace('{from}', formatTime(h.example.from))
-            .replace('{to}', formatTime(h.example.to))
-            .replace('{date}', formatDate(h.example.date, { day: '2-digit', month: '2-digit' }));
+          // "#5 Fr 09.10. 18:00" — a keyframe at day index d of the year
+          const at = p => {
+            const date = addDays(`${year}-01-01`, p.d);
+            return `<strong>${num(p.i)}</strong> ${formatDate(date, { weekday: 'short', day: '2-digit', month: '2-digit' })} ${formatTime(p.m)}`;
+          };
+          const hours = h => `${Math.round(h)} h`;
+          if (h.type === 'overnight') {
+            return t('hint_overnight')
+              .replace(/\{k\}/g, `<strong>${num(h.kf)}</strong>`)
+              .replace('{n}', h.days)
+              .replace('{from}', formatTime(h.example.from.m))
+              .replace('{to}', formatTime(h.example.to.m))
+              .replace('{date}', formatDate(addDays(`${year}-01-01`, h.example.to.d), { day: '2-digit', month: '2-digit' }));
+          }
+          if (h.type === 'multiDay') {
+            return t('hint_multi_day')
+              .replace(/\{k\}/g, `<strong>${num(h.kf)}</strong>`)
+              .replace('{n}', h.days)
+              .replace('{from}', at(h.example.from))
+              .replace('{to}', at(h.example.to))
+              .replace('{hours}', hours(h.example.hours));
+          }
+          if (h.type === 'emptyDays') {
+            const when = [];
+            if (h.weekdays.length) when.push(t('hint_every') + ' ' + h.weekdays.map(w => t('day_' + WEEKDAYS[w])).join(', '));
+            if (h.rest.length) when.push(formatDayRanges(h.rest, h.year));
+            let text = t('hint_empty_days').replace('{n}', h.count).replace('{when}', when.join(' · '));
+            if (h.longest) {
+              text += ' ' + t(h.ramp ? 'hint_empty_longest_ramp' : 'hint_empty_longest')
+                .replace('{k}', `<strong>${num(h.longest.to.i)}</strong>`)
+                .replace('{from}', at(h.longest.from))
+                .replace('{to}', at(h.longest.to))
+                .replace('{hours}', hours(h.longest.hours))
+                .replace('{value}', `${Math.round(h.held.dim)} %, ${Math.round(h.held.kelvin)} K`);
+              if (h.longest.hours > PICO_LOOKAROUND_DAYS * 24) {
+                text += ' ' + t('hint_empty_pico').replace(/\{max\}/g, PICO_LOOKAROUND_DAYS);
+              }
+            }
+            return text;
+          }
+          if (h.type === 'never') {
+            return t('hint_never_' + h.reason)
+              .replace('{k}', `<strong>${num(h.kf)}</strong>`)
+              .replace('{year}', h.year)
+              .replace('{valid}', validSummary(state.keyframes[h.kf]) || t('valid_daily'))
+              .replace('{g}', `${t('group')} ${state.keyframes[h.kf].group}`);
+          }
+          if (h.type === 'periodAll') {
+            return t('hint_period_all')
+              .replace('{k}', `<strong>${num(h.kf)}</strong>`)
+              .replace('{valid}', validSummary(state.keyframes[h.kf]));
+          }
+          return '';
         };
         html += `
           <div class="lkl-banner is-warn spaced hints">
@@ -2836,20 +2997,24 @@ const translations = {
      * the curve across midnight comes from the real neighbouring days, and a
      * day without keyframes (valid-on filters) holds the last value — as the
      * PICO does. Mirrors scheduler.py, Evaluator.timeline_for.
+     * The search covers a year, so even a half-year pause holds its value
+     * (the PICO itself only looks 8 days back — see PICO_LOOKAROUND_DAYS).
      */
+    const TIMELINE_SEARCH_DAYS = 366;
     let timelineCache = new Map();
     function resolveTimeline(dateStr) {
       let list = timelineCache.get(dateStr);
       if (list) return list;
+      if (!state.keyframes.length) return [];
       const shifted = k => resolveKeyframes(addDays(dateStr, k))
         .map(kf => ({ ...kf, minutes: parseTime(kf.time) + 1440 * k }));
       list = [];
-      for (let k = -1; k >= -7; k--) {
+      for (let k = -1; k >= -TIMELINE_SEARCH_DAYS; k--) {
         const day = shifted(k);
         if (day.length) { list.push(...day); break; }
       }
       list.push(...shifted(0));
-      for (let k = 1; k <= 7; k++) {
+      for (let k = 1; k <= TIMELINE_SEARCH_DAYS; k++) {
         const day = shifted(k);
         if (day.length) { list.push(...day); break; }
       }
@@ -3711,6 +3876,17 @@ const translations = {
       html += pill(t('sun_sunset'), fmt(e.sunset));
       html += pill(t('sun_civil_dusk'), fmt(e.civil_dusk));
       html += pill(t('day_length'), sun.dayLength == null ? '—' : formatDuration(sun.dayLength));
+      // No keyframe fires today (valid-on): name the one whose value holds
+      if (state.keyframes.length && !resolveKeyframes(viewDate).length) {
+        const before = resolveTimeline(viewDate).filter(k => k.minutes < 0).pop();
+        const since = before
+          ? t('day_hold_since')
+            .replace('{k}', `#${before.sourceIndex + 1}`)
+            .replace('{date}', formatDate(addDays(viewDate, Math.floor(before.minutes / 1440)), { weekday: 'short', day: '2-digit', month: '2-digit' }))
+            .replace('{time}', formatTime(((before.minutes % 1440) + 1440) % 1440))
+          : '';
+        html += `<button class="lkl-pill is-warn" onclick="openConflicts()">${t('day_no_keyframes')}${since}</button>`;
+      }
       // Unresolved overlaps on this day — click opens the rule list
       overlapsOn(viewDate).forEach(o => {
         html += `<button class="lkl-pill is-danger overlap-pill" onclick="openConflicts()">
@@ -4375,6 +4551,8 @@ const translations = {
     const PICO_DALI_MAX_FADE = 900;
     // Above this size the export view warns (largest setup.json known to run: ~34 KB)
     const PICO_SIZE_HINT_KB = 32;
+    // The PICO searches this many days back for the previous entry
+    const PICO_LOOKAROUND_DAYS = 8;
     // Events the PICO lacks → a supported event plus offset. Solar midnight is
     // noon − 12 h (astro.js); golden hour gets the year's mean distance.
     const PICO_SUBSTITUTES = {
@@ -4451,6 +4629,18 @@ const translations = {
       const perDay = dates.map(resolveFiringMinutes);
       const warnings = [];
 
+      // Pauses the PICO cannot bridge: it looks for the previous entry only
+      // PICO_LOOKAROUND_DAYS back (dailyschedulerbehavior.cpp), so after a
+      // longer run of days without entries it loses the value
+      const quiet = [];
+      let quietRun = [];
+      for (let d = 0; d <= days; d++) {
+        if (d < days && perDay[d].every(m => m == null)) { quietRun.push(d); continue; }
+        if (quietRun.length > PICO_LOOKAROUND_DAYS) quiet.push(...quietRun);
+        quietRun = [];
+      }
+      if (quiet.length) warnings.push({ type: 'lookaround', days: quiet, year });
+
       // Mean offsets of substituted sun events
       const subst = {};
       kfs.forEach(kf => {
@@ -4489,6 +4679,7 @@ const translations = {
       // the day gap to the predecessor and the ramp length in minutes.
       const rampDelay = kf => (kf.mode === 'transition' && kf.transitionDirection !== 'before' ? kf.transitionSeconds / 60 : 0);
       const preds = {};   // k → { pred → { days: [d…], gaps: { gap: n }, min, max } }
+      const multiDayPreds = {};   // k → { days, hours } — predecessor 2+ days back
       let previousLast = null, previousDay = null;
       for (let d = -8; d < days; d++) {
         const list = resolveKeyframes(addDays(`${year}-01-01`, d))
@@ -4499,6 +4690,17 @@ const translations = {
             const gap = pos > 0 ? 0 : d - previousDay;
             const pred = pos > 0 ? list[pos - 1] : previousLast;
             if (!pred) return;
+            // A predecessor more than a day back (days without keyframes in
+            // between): a ramp over days would take hundreds of 15-min pieces,
+            // so the PICO gets no ramp there — k is set at its own time
+            if (gap > 1) {
+              if (kfs[k.i].mode === 'interpolate') {
+                const md = multiDayPreds[k.i] = multiDayPreds[k.i] || { days: 0, hours: 0 };
+                md.days++;
+                md.hours = Math.max(md.hours, (1440 * gap + k.m - pred.m) / 60);
+              }
+              return;
+            }
             const byPred = preds[k.i] = preds[k.i] || {};
             const r = byPred[pred.i] = byPred[pred.i] || { days: [], gaps: {}, min: Infinity, max: -Infinity };
             const len = k.m + 1440 * gap - (pred.m + rampDelay(kfs[pred.i]));
@@ -4749,9 +4951,11 @@ const translations = {
         }
         if (kf.mode !== 'interpolate') { emit(ownSlot(i)); return; }
         const { slots, uncovered, needOwn } = rampSlots(i);
+        const multiDay = multiDayPreds[i];
         slots.forEach(emit);
-        if (needOwn || !slots.length) emit(ownSlot(i));
+        if (needOwn || !slots.length || multiDay) emit(ownSlot(i));
         if (uncovered) warnings.push({ type: 'pred', kf: i, days: uncovered });
+        if (multiDay) warnings.push({ type: 'multiDay', kf: i, ...multiDay });
       });
       if (linear.size) warnings.push({ type: 'linear', kfs: [...linear].sort((a, b) => a - b) });
 
@@ -4804,6 +5008,12 @@ const translations = {
         }
         case 'group':
           return t('pico_warn_group').replace('{g}', `<strong>${t('group')} ${w.group}</strong>`);
+        case 'multiDay':
+          return t('pico_warn_multi_day').replace(/\{k\}/g, num(w.kf)).replace('{n}', w.days)
+            .replace('{hours}', Math.round(w.hours));
+        case 'lookaround':
+          return t('pico_warn_lookaround').replace('{n}', w.days.length)
+            .replace('{ranges}', formatDayRanges(w.days, w.year)).replace(/\{max\}/g, PICO_LOOKAROUND_DAYS);
         case 'order':
           return t('pico_warn_order').replace('{n}', w.days.length).replace('{ranges}', formatDayRanges(w.days, w.year));
         default:
