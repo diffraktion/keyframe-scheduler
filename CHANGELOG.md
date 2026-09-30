@@ -2,7 +2,9 @@
 
 ## Component
 
-### [Unreleased]
+### [4.0.0-beta.1] - 2026-09-30 — not tested yet
+
+> Beta: not yet tested in a live Home Assistant installation. The light type timing defaults in particular still need to be validated.
 
 #### Breaking
 - **The integration controls the lights itself; the blueprint `keyframe_smart_light_follower` is removed.** Delete existing blueprint automations, otherwise two places control the same light. The previous follow lights are migrated (type from the previous hardware limit) — check them under Configure.
