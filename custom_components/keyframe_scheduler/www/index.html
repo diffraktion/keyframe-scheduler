@@ -125,9 +125,14 @@
       font-size: var(--lkl-fs-md);
     }
     .keyframes-table input[type="time"]   { width: 104px; }
-    .keyframes-table input[type="number"] { width: 84px; }
+    .keyframes-table input[type="number"] { width: 72px; }
     .keyframes-table .hms input[type="number"] { width: 52px; }
-    .keyframes-table .lkl-select { width: auto; min-width: 100px; }
+    .keyframes-table .lkl-select { width: auto; min-width: 0; }
+    /* Compact columns so the table fits the page without scrolling;
+       headers may wrap ("Transition (H:M:S)") */
+    .keyframes-table th,
+    .keyframes-table td { padding-left: var(--lkl-space-2); padding-right: var(--lkl-space-2); }
+    .keyframes-table th { white-space: normal; vertical-align: bottom; }
 
     .keyframes-table td.is-inactive > * { opacity: .35; }
 
@@ -151,6 +156,45 @@
     .valid-dates { display: inline-flex; align-items: center; gap: var(--lkl-space-1); }
     .keyframes-table .valid-editor input.valid-day { width: 56px; }
     .valid-help { flex-basis: 100%; font-size: var(--lkl-fs-sm); color: var(--lkl-text-3); }
+
+    /* Narrower than the table (~1280 px content): every keyframe becomes a
+       card — the fields wrap, each with its column name above, unused ones
+       (transition fields of an instant keyframe) are hidden. No sideways
+       scrolling. */
+    @media (max-width: 1399px) {
+      .keyframes-table thead { display: none; }
+      .keyframes-table,
+      .keyframes-table tbody { display: block; }
+      .keyframes-table tbody tr[data-index] {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: var(--lkl-space-2) var(--lkl-space-3);
+        padding: var(--lkl-space-3) 0;
+        border-bottom: 1px solid var(--lkl-border);
+      }
+      .keyframes-table tbody tr[data-index] td,
+      .keyframes-table tbody tr[data-index]:hover td { display: block; padding: 0; border: none; background: none; }
+      .keyframes-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: var(--lkl-space-1);
+        font-size: var(--lkl-fs-xs);
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--lkl-text-3);
+      }
+      /* Cells without a label line up with the fields, not with the labels */
+      .keyframes-table tbody tr[data-index] td:not([data-label]) {
+        padding-top: calc(var(--lkl-fs-xs) * var(--lkl-lh-base) + var(--lkl-space-1));
+      }
+      .keyframes-table tbody tr[data-index] td.is-inactive { display: none; }
+      .keyframes-table td.trigger-td { min-width: 0; }
+      .keyframes-table td.row-delete { margin-left: auto; }
+      .keyframes-table tr.valid-row,
+      .keyframes-table tr.valid-row td { display: block; padding: 0 0 var(--lkl-space-3); border: none; }
+    }
 
     .hms { display: flex; gap: var(--lkl-space-1); align-items: center; }
     .hms-sep { color: var(--lkl-text-3); }
@@ -217,9 +261,9 @@
 
     /* ---- Trigger cell -------------------------------------------------------- */
     .trigger { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lkl-space-1); }
-    /* Room for "Sonne · event · offset · min · resolved time" on one line;
-       the table scrolls horizontally on narrow screens instead. */
-    .keyframes-table td.trigger-td { min-width: 370px; }
+    /* Room for "Sonne · event" on one line; offset and the two bounds wrap
+       below. Narrower screens scroll the table (not the page). */
+    .keyframes-table td.trigger-td { min-width: 290px; }
     .keyframes-table .trigger .event-select { max-width: 180px; }
     .trigger + .trigger { margin-top: var(--lkl-space-1); }
     .trigger-label { font-size: var(--lkl-fs-xs); color: var(--lkl-text-3); }
@@ -2757,13 +2801,13 @@ const translations = {
               <th style="width: 40px;">#</th>
               <th style="width: 60px;">${t('th_group')}</th>
               <th>${t('th_time')}</th>
-              <th style="width: 110px;">${t('th_valid')}</th>
-              <th style="width: 100px;">${t('th_brightness')}</th>
-              <th style="width: 100px;">${t('th_kelvin')}</th>
-              <th style="width: 120px;">${t('th_mode')}</th>
-              <th style="width: 150px;">${t('th_transition')}</th>
-              <th style="width: 100px;">${t('th_direction')}</th>
-              <th style="width: 100px;">${t('th_curve')}</th>
+              <th>${t('th_valid')}</th>
+              <th>${t('th_brightness')}</th>
+              <th>${t('th_kelvin')}</th>
+              <th>${t('th_mode')}</th>
+              <th>${t('th_transition')}</th>
+              <th>${t('th_direction')}</th>
+              <th>${t('th_curve')}</th>
               <th style="width: 60px;"></th>
             </tr>
           </thead>
@@ -2778,36 +2822,36 @@ const translations = {
           <tr draggable="true" data-index="${index}">
             <td><span class="cell-line drag-handle">⋮⋮</span></td>
             <td><span class="cell-line row-number">${index + 1}</span></td>
-            <td>
+            <td data-label="${t('th_group')}">
               <select class="lkl-select group-select" title="${t('group_title')}" onchange="updateKeyframe(${index}, 'group', this.value)">
                 <option value="" ${kf.group ? '' : 'selected'}>–</option>
                 ${GROUP_IDS.map(id => `<option value="${id}" ${kf.group === id ? 'selected' : ''}>${id}</option>`).join('')}
               </select>
             </td>
-            <td class="trigger-td">${renderTriggerCell(kf, index)}</td>
-            <td>
+            <td class="trigger-td" data-label="${t('th_time')}">${renderTriggerCell(kf, index)}</td>
+            <td data-label="${t('th_valid')}">
               <button class="lkl-chip is-compact valid-toggle ${hasValidOn(kf) ? 'is-active' : ''}"
                       aria-expanded="${validOpen.has(kf.id)}" title="${t('valid_title')}"
                       onclick="toggleValidEditor('${kf.id}')">${validSummary(kf) || t('valid_daily')}</button>
             </td>
-            <td>
+            <td data-label="${t('th_brightness')}">
               <input class="lkl-input" type="number" min="0" max="100" step="5"
                      value="${kf.dim}"
                      oninput="updateKeyframe(${index}, 'dim', this.value)">
             </td>
-            <td>
+            <td data-label="${t('th_kelvin')}">
               <input class="lkl-input" type="number" min="2000" max="6500" step="100"
                      value="${kf.kelvin}"
                      oninput="updateKeyframe(${index}, 'kelvin', this.value)">
             </td>
-            <td>
+            <td data-label="${t('th_mode')}">
               <select class="lkl-select" onchange="updateKeyframe(${index}, 'mode', this.value)">
                 <option value="instant" ${kf.mode === 'instant' ? 'selected' : ''}>${t('mode_instant')}</option>
                 <option value="transition" ${kf.mode === 'transition' ? 'selected' : ''}>${t('mode_transition')}</option>
                 <option value="interpolate" ${kf.mode === 'interpolate' ? 'selected' : ''}>${t('mode_interpolate')}</option>
               </select>
             </td>
-            <td class="${!showTransition ? 'is-inactive' : ''}">
+            <td data-label="${t('th_transition')}" class="${!showTransition ? 'is-inactive' : ''}">
               <div class="hms">
                 <input class="lkl-input" type="number" min="0" max="23" step="1"
                        value="${Math.floor(kf.transitionSeconds / 3600)}"
@@ -2831,7 +2875,7 @@ const translations = {
                        onchange="updateTransitionTime(${index}, this.parentElement)">
               </div>
             </td>
-            <td class="${!showTransition ? 'is-inactive' : ''}">
+            <td data-label="${t('th_direction')}" class="${!showTransition ? 'is-inactive' : ''}">
               <select class="lkl-select" onchange="updateKeyframe(${index}, 'transitionDirection', this.value)"
                       ${!showTransition ? 'disabled' : ''}
                       title="${showTransition ? t('th_direction') : t('mode_interpolate') + ' - nicht verwendet'}">
@@ -2839,14 +2883,14 @@ const translations = {
                 <option value="before" ${kf.transitionDirection === 'before' ? 'selected' : ''}>${t('dir_before')}</option>
               </select>
             </td>
-            <td class="${!showCurve ? 'is-inactive' : ''}">
+            <td data-label="${t('th_curve')}" class="${!showCurve ? 'is-inactive' : ''}">
               <select class="lkl-select" onchange="updateKeyframe(${index}, 'curve', this.value)"
                       ${!showCurve ? 'disabled' : ''}>
                 <option value="linear" ${kf.curve === 'linear' ? 'selected' : ''}>${t('curve_linear')}</option>
                 <option value="sinus" ${kf.curve === 'sinus' ? 'selected' : ''}>${t('curve_sinus')}</option>
               </select>
             </td>
-            <td>
+            <td class="row-delete">
               <button class="lkl-btn is-quiet is-small is-danger" onclick="deleteKeyframe(${index})"
                       title="Delete" aria-label="Delete">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
