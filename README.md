@@ -147,6 +147,12 @@ After installation **Keyframe Scheduler** appears as a sidebar entry in Home Ass
 
 Available languages: DE / EN / ES
 
+### PICO lightnode export
+
+**PICO DailyScheduler** (Export & Import) generates the `DAILYSCHEDULER` behavior for a PICO lightnode `setup.json`: paste it into the `behaviors` of a target with space `TC`. Targets, adjust/override behaviors and destinations stay in the setup; latitude, longitude and time zone come from the PICO configuration (`pico.latitude` / `pico.longitude`).
+
+One entry per keyframe keeps the file small: sun triggers, offsets, not-before/not-after bounds and groups (`EARLIEST`/`LATEST`) are translated 1:1. The PICO only fades linearly with a fixed duration, so sine curves become linear and an interpolation anchored to the sun uses the shortest ramp of the year (the target is reached early and held). The export view lists every difference from the simulation.
+
 ---
 
 ## Requirements

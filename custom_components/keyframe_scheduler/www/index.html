@@ -558,6 +558,7 @@
       <div class="btn-row">
         <button class="lkl-btn is-primary" id="downloadJsonBtn">Als Datei speichern</button>
         <button class="lkl-btn" id="downloadPdfBtn">PDF Export</button>
+        <button class="lkl-btn" id="downloadPicoBtn">PICO DailyScheduler</button>
       </div>
       <input type="file" id="fileInput" accept=".json" hidden>
 
@@ -569,6 +570,12 @@
             <span id="btn-import-json">JSON übernehmen</span>
           </button>
         </div>
+      </details>
+
+      <details id="picoDetails">
+        <summary id="pico-summary">PICO-DailyScheduler anzeigen</summary>
+        <div id="picoNotes"></div>
+        <textarea id="picoOutput" class="lkl-code json-box" readonly></textarea>
       </details>
 
       <div class="lkl-banner spaced" id="workflow-box">
@@ -1234,6 +1241,18 @@ const translations = {
     hint_mixed_modes: "{g} mischt Modi ({modes}). Je nachdem, welcher Keyframe gewinnt, ändert sich der Verlauf davor und danach – am besten allen Mitgliedern denselben Modus geben.",
     hint_predecessor: "{k} (Interpolate) startet je nach Tag bei einem anderen Keyframe: {list}. Der Verlauf vor {k} ändert sich deshalb im Jahresverlauf.",
     hint_overnight: "{k} (Interpolate) interpoliert an {n} Tagen über Mitternacht, z. B. {from} → {to} am {date} – die ganze Nacht ändert sich. Soll die Nacht konstant bleiben, {k} auf Transition stellen.",
+    pico_export: "PICO DailyScheduler",
+    pico_summary: "PICO-DailyScheduler anzeigen",
+    pico_intro: "Behavior-Block für das setup.json eines PICO lightnode – in die <code>behaviors</code> eines Targets mit Space <code>TC</code> einfügen. Sonnenzeiten rechnet der PICO mit Koordinaten und Zeitzone aus seiner eigenen Konfiguration (<code>pico.latitude</code> / <code>pico.longitude</code>) – für diesen Plan: {lat}, {lon}.",
+    pico_size: "{n} Einträge · {kb} KB",
+    pico_warn_title: "Abweichungen zur Simulation",
+    pico_no_warnings: "Keine Abweichungen – der PICO fährt denselben Verlauf wie die Simulation.",
+    pico_warn_linear: "{list}: Sinus-Kurve wird als linearer Fade exportiert (der PICO blendet nur linear).",
+    pico_warn_fade: "{k}: Die Interpolation dauert je nach Tag {min}–{max}. Der PICO blendet immer {min} lang und hält danach den Wert.",
+    pico_warn_pred: "{k} startet im PICO immer nach {p}; an {n} Tagen folgt es in der Simulation auf einen anderen Keyframe.",
+    pico_warn_substitute: "{k}: „{event}“ kennt der PICO nicht – exportiert als „{base}“ {offset} (Abweichung bis {dev} min).",
+    pico_warn_group: "{g}: Die Mitglieder beginnen unterschiedlich früh (Transition davor / Interpolation). Der PICO vergleicht die Startzeiten, nicht die Keyframe-Zeiten – der Gewinner kann abweichen.",
+    pico_warn_order: "Die Reihenfolge der Einträge wechselt an {n} Tagen ({ranges}). Der PICO verlangt pro Tag eine chronologische Reihenfolge – Konflikte gruppieren.",
     days_short: "Tage",
     
     // Modes
@@ -1463,6 +1482,18 @@ const translations = {
     hint_mixed_modes: "{g} mixes modes ({modes}). Depending on which keyframe wins, the curve before and after it changes – ideally give all members the same mode.",
     hint_predecessor: "{k} (Interpolate) starts from a different keyframe depending on the day: {list}. The curve before {k} therefore changes over the year.",
     hint_overnight: "{k} (Interpolate) interpolates across midnight on {n} days, e.g. {from} → {to} on {date} – the whole night changes. To keep the night constant, set {k} to Transition.",
+    pico_export: "PICO DailyScheduler",
+    pico_summary: "Show PICO DailyScheduler",
+    pico_intro: "Behavior block for a PICO lightnode setup.json – paste it into the <code>behaviors</code> of a target with space <code>TC</code>. The PICO computes sun times from the coordinates and time zone of its own configuration (<code>pico.latitude</code> / <code>pico.longitude</code>) – for this schedule: {lat}, {lon}.",
+    pico_size: "{n} entries · {kb} KB",
+    pico_warn_title: "Differences from the simulation",
+    pico_no_warnings: "No differences – the PICO runs the same curve as the simulation.",
+    pico_warn_linear: "{list}: sine curve is exported as a linear fade (the PICO only fades linearly).",
+    pico_warn_fade: "{k}: the interpolation takes {min}–{max} depending on the day. The PICO always fades for {min} and then holds the value.",
+    pico_warn_pred: "{k} always starts after {p} on the PICO; on {n} days the simulation has another keyframe before it.",
+    pico_warn_substitute: "{k}: the PICO has no \"{event}\" – exported as \"{base}\" {offset} (up to {dev} min off).",
+    pico_warn_group: "{g}: the members start at different lead times (transition before / interpolation). The PICO compares start times, not keyframe times – the winner may differ.",
+    pico_warn_order: "The order of the entries changes on {n} days ({ranges}). The PICO needs each day's entries in chronological order – group the conflicts.",
     days_short: "days",
     
     // Modes
@@ -1692,6 +1723,18 @@ const translations = {
     hint_mixed_modes: "{g} mezcla modos ({modes}). Según qué keyframe gane, cambia la curva antes y después – mejor dar a todos los miembros el mismo modo.",
     hint_predecessor: "{k} (Interpolar) empieza desde un keyframe distinto según el día: {list}. Por eso la curva antes de {k} cambia a lo largo del año.",
     hint_overnight: "{k} (Interpolar) interpola a través de la medianoche durante {n} días, p. ej. {from} → {to} el {date} – cambia toda la noche. Para mantener la noche constante, pon {k} en Transición.",
+    pico_export: "PICO DailyScheduler",
+    pico_summary: "Mostrar DailyScheduler PICO",
+    pico_intro: "Bloque behavior para el setup.json de un PICO lightnode – pégalo en los <code>behaviors</code> de un target con space <code>TC</code>. El PICO calcula las horas solares con las coordenadas y la zona horaria de su propia configuración (<code>pico.latitude</code> / <code>pico.longitude</code>) – para este plan: {lat}, {lon}.",
+    pico_size: "{n} entradas · {kb} KB",
+    pico_warn_title: "Diferencias con la simulación",
+    pico_no_warnings: "Sin diferencias – el PICO ejecuta la misma curva que la simulación.",
+    pico_warn_linear: "{list}: la curva sinusoidal se exporta como fundido lineal (el PICO solo funde linealmente).",
+    pico_warn_fade: "{k}: la interpolación dura {min}–{max} según el día. El PICO funde siempre {min} y luego mantiene el valor.",
+    pico_warn_pred: "{k} empieza en el PICO siempre después de {p}; durante {n} días la simulación tiene otro keyframe antes.",
+    pico_warn_substitute: "{k}: el PICO no conoce «{event}» – se exporta como «{base}» {offset} (desviación hasta {dev} min).",
+    pico_warn_group: "{g}: los miembros empiezan con distinta antelación (transición antes / interpolación). El PICO compara las horas de inicio, no las de los keyframes – el ganador puede variar.",
+    pico_warn_order: "El orden de las entradas cambia durante {n} días ({ranges}). El PICO necesita las entradas de cada día en orden cronológico – agrupa los conflictos.",
     days_short: "días",
     
     // Modes
@@ -1931,6 +1974,9 @@ const translations = {
       document.getElementById('loadFileBtn').textContent = t('load_file');
       document.getElementById('downloadJsonBtn').textContent = t('save_file');
       document.getElementById('downloadPdfBtn').textContent = t('pdf_export');
+      document.getElementById('downloadPicoBtn').textContent = t('pico_export');
+      document.getElementById('pico-summary').textContent = t('pico_summary');
+      renderPico();
       document.getElementById('downloadCsvBtn').textContent = t('csv_export');
     }
     
@@ -3986,6 +4032,7 @@ const translations = {
     function updateJsonOutput() {
       const json = generateHaJson();
       document.getElementById('jsonOutput').value = JSON.stringify(json, null, 2);
+      renderPico();
     }
 
     function downloadJson() {
@@ -4000,6 +4047,354 @@ const translations = {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
       a.download = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ============================================================================
+    // PICO LIGHTNODE EXPORT
+    // ============================================================================
+    //
+    // Exports the schedule as the DAILYSCHEDULER behavior of a PICO lightnode
+    // setup.json (pico-core: behaviors/dailyschedulerbehavior.cpp). Only the
+    // behavior — targets, adjust/override behaviors and destinations belong to
+    // the setup and are not touched.
+    //
+    // A PICO entry fires at its time and fades LINEARLY to its point within
+    // `fade` seconds. One entry per keyframe keeps the file small (the ESP32
+    // handles large files badly, and DALI must not be flooded with steps):
+    //   instant            at the keyframe, fade 0
+    //   transition after   at the keyframe, fade = transition
+    //   transition before  at keyframe − transition, fade = transition
+    //   interpolate        where the ramp starts (predecessor's time, or the
+    //                      end of its transition), fade = the SHORTEST ramp of
+    //                      the year — on longer days the target is reached
+    //                      early and held. After an instant predecessor the
+    //                      simulation does not ramp (evaluateSchedule), so the
+    //                      keyframe is exported like an instant one.
+    // Bounds and groups become EARLIEST/LATEST composites. Nesting the bounds
+    // in the right order reproduces resolveKeyframeMinutes' fallback on days
+    // without the event. Latitude, longitude and time zone come from the
+    // PICO's own configuration.
+
+    const PICO_EVENTS = {
+      astronomical_dawn: 'RELATIVETOASTRONOMICALDAWN',
+      nautical_dawn: 'RELATIVETONAUTICALDAWN',
+      civil_dawn: 'RELATIVETOCIVILDAWN',
+      sunrise: 'RELATIVETOSUNRISE',
+      solar_noon: 'RELATIVETONOON',
+      sunset: 'RELATIVETOSUNSET',
+      civil_dusk: 'RELATIVETOCIVILDUSK',
+      nautical_dusk: 'RELATIVETONAUTICALDUSK',
+      astronomical_dusk: 'RELATIVETOASTRONOMICALDUSK'
+    };
+    // Events the PICO lacks → a supported event plus offset. Solar midnight is
+    // noon − 12 h (astro.js); golden hour gets the year's mean distance.
+    const PICO_SUBSTITUTES = {
+      solar_midnight: 'solar_noon',
+      golden_hour_end: 'sunrise',
+      golden_hour_start: 'sunset'
+    };
+
+    /** Signed seconds → PICO's hours/minutes/seconds (each carries the sign). */
+    function picoOffset(totalSeconds) {
+      const sign = totalSeconds < 0 ? -1 : 1;
+      let s = Math.round(Math.abs(totalSeconds));
+      const hours = Math.floor(s / 3600);
+      s -= hours * 3600;
+      const minutes = Math.floor(s / 60);
+      return { hours: sign * hours || 0, minutes: sign * minutes || 0, seconds: sign * (s - minutes * 60) || 0 };
+    }
+
+    function picoPoint(kf, fadeSeconds) {
+      return {
+        space: 'TC',
+        brightness: Math.round(kf.dim * 10) / 1000,
+        temperature: Math.round(kf.kelvin),
+        fade: Math.max(0, Math.round(fadeSeconds))
+      };
+    }
+
+    /**
+     * Build the DAILYSCHEDULER behavior for the year of viewDate:
+     *   { behavior, entryCount, warnings: [{ type, … }] }
+     */
+    function buildPicoScheduler() {
+      const kfs = state.keyframes;
+      const year = parseDate(viewDate).y;
+      const days = daysInYear(year);
+      const dates = [];
+      for (let d = 0; d < days; d++) dates.push(addDays(`${year}-01-01`, d));
+      const perDay = dates.map(resolveFiringMinutes);
+      const warnings = [];
+
+      // Mean offsets of substituted sun events
+      const subst = {};
+      kfs.forEach(kf => {
+        const ev = kf.sunEvent;
+        if (kf.trigger !== 'sun' || !PICO_SUBSTITUTES[ev] || subst[ev]) return;
+        const base = PICO_SUBSTITUTES[ev];
+        if (ev === 'solar_midnight') { subst[ev] = { base, seconds: -12 * 3600, dev: 0 }; return; }
+        const diffs = [];
+        dates.forEach(date => {
+          const sun = getSunTimes(date);
+          if (sun && sun.events[ev] != null && sun.events[base] != null) diffs.push(sun.events[ev] - sun.events[base]);
+        });
+        const mean = diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0;
+        subst[ev] = { base, seconds: Math.round(mean * 60), dev: Math.max(0, ...diffs.map(x => Math.abs(x - mean))) };
+      });
+      kfs.forEach((kf, i) => {
+        if (kf.trigger === 'sun' && subst[kf.sunEvent] && kf.sunEvent !== 'solar_midnight') {
+          warnings.push({ type: 'substitute', kf: i, ...subst[kf.sunEvent], event: kf.sunEvent });
+        }
+      });
+
+      // Ramp start of each interpolate keyframe: its predecessor per day and
+      // the ramp length (minutes), as in analyzeHints()
+      const rampDelay = kf => (kf.mode === 'transition' && kf.transitionDirection !== 'before' ? kf.transitionSeconds / 60 : 0);
+      const ramps = {};   // k → { pred → { days, min, max } }
+      let previousLast = null;
+      for (let d = -1; d < days; d++) {
+        const list = resolveKeyframes(addDays(`${year}-01-01`, d))
+          .map(k => ({ i: k.sourceIndex, m: parseTime(k.time) }))
+          .sort((a, b) => a.m - b.m);
+        if (d >= 0) {
+          list.forEach((k, pos) => {
+            if (kfs[k.i].mode !== 'interpolate') return;
+            const pred = pos > 0 ? list[pos - 1] : previousLast && { i: previousLast.i, m: previousLast.m - 1440 };
+            if (!pred) return;
+            const byPred = ramps[k.i] = ramps[k.i] || {};
+            const r = byPred[pred.i] = byPred[pred.i] || { days: 0, min: Infinity, max: -Infinity };
+            const len = k.m - (pred.m + rampDelay(kfs[pred.i]));
+            r.days++;
+            r.min = Math.min(r.min, len);
+            r.max = Math.max(r.max, len);
+          });
+        }
+        if (list.length) previousLast = list[list.length - 1];
+      }
+      // Keyframes of a group with a priority rule share one PICO composite
+      const groups = listGroups();
+      const groupOf = i => {
+        const g = kfs[i].group ? groups.find(x => x.id === kfs[i].group) : null;
+        return g && g.rule !== 'all' && g.members.length > 1 ? g : null;
+      };
+      const sameSlot = (a, b) => a === b || (groupOf(a) && groupOf(a) === groupOf(b));
+
+      // The most frequent predecessor is the one exported. Members of one
+      // group count as the same predecessor — the composite picks the member.
+      const mainPred = {};
+      Object.keys(ramps).forEach(k => {
+        const entries = Object.entries(ramps[k]).map(([p, r]) => ({ pred: +p, ...r })).sort((a, b) => b.days - a.days);
+        mainPred[k] = entries[0];
+        const others = entries.filter(e => !sameSlot(e.pred, entries[0].pred)).reduce((n, e) => n + e.days, 0);
+        if (others) warnings.push({ type: 'pred', kf: +k, pred: entries[0].pred, days: others });
+      });
+      const ramping = i => {
+        const p = mainPred[i];
+        return kfs[i].mode === 'interpolate' && p && ['transition', 'interpolate'].includes(kfs[p.pred].mode);
+      };
+
+      // Keyframe i's time with its bounds; shiftSeconds moves everything
+      const timeEntry = (i, shiftSeconds, point) => {
+        const kf = kfs[i];
+        const local = minutes => {
+          const s = ((Math.round(minutes * 60 + shiftSeconds) % 86400) + 86400) % 86400;
+          return { type: 'LOCALTIME', ...picoOffset(s), point };
+        };
+        if (kf.trigger !== 'sun') return local(parseTime(kf.time));
+        const sub = subst[kf.sunEvent];
+        const event = sub ? sub.base : kf.sunEvent;
+        let entry = {
+          type: PICO_EVENTS[event],
+          ...picoOffset((kf.offsetMinutes || 0) * 60 + (sub ? sub.seconds : 0) + shiftSeconds),
+          point
+        };
+        // Clamp to the bounds. The inner composite decides what a missing
+        // event falls back to: rising events → notBefore, others → notAfter.
+        const lo = kf.notBefore ? local(parseTime(kf.notBefore)) : null;
+        const hi = kf.notAfter ? local(parseTime(kf.notAfter)) : null;
+        const order = KfAstro.EVENTS[kf.sunEvent].rising ? [['LATEST', lo], ['EARLIEST', hi]] : [['EARLIEST', hi], ['LATEST', lo]];
+        order.forEach(([type, bound]) => { if (bound) entry = { type, entries: [entry, bound] }; });
+        return entry;
+      };
+      // Keyframe i — or the member of its group that fires — shifted per member
+      const anchorEntry = (i, shiftFn, pointFn) => {
+        const g = groupOf(i);
+        if (!g) return timeEntry(i, shiftFn(i), pointFn(i));
+        return { type: g.rule.toUpperCase(), entries: g.members.map(m => timeEntry(m, shiftFn(m), pointFn(m))) };
+      };
+      const anchorTime = (i, d, shiftFn) => {
+        const g = groupOf(i);
+        const m = (g ? g.members : [i]).find(x => perDay[d][x] != null);
+        return m == null ? null : perDay[d][m] + shiftFn(m) / 60;
+      };
+
+      // Where a ramp towards the next keyframe starts after keyframe m (+1 s
+      // if m's own entry sits at the same instant — two entries must not tie)
+      const rampShift = m => {
+        const kf = kfs[m];
+        if (kf.mode === 'transition' && kf.transitionDirection !== 'before') {
+          return kf.transitionSeconds > 0 ? kf.transitionSeconds : 1;
+        }
+        return kf.mode === 'transition' ? 0 : 1;
+      };
+      const ownShift = m => {
+        const kf = kfs[m];
+        return kf.mode === 'transition' && kf.transitionDirection === 'before' ? -kf.transitionSeconds : 0;
+      };
+
+      // Keyframe i's own entry: { json, timeOn(d), timeOnly }
+      const ownEntry = i => {
+        const kf = kfs[i];
+        if (ramping(i)) {
+          const p = mainPred[i];
+          // Each member of the predecessor's group gets the ramp length of
+          // the days it wins; the fade can only be fixed per member.
+          const rampOf = m => (ramps[i][m] && sameSlot(m, p.pred) ? ramps[i][m] : p);
+          const spread = [...new Set((groupOf(p.pred) ? groupOf(p.pred).members : [p.pred]).map(rampOf))]
+            .reduce((w, r) => (r.max - r.min > w.max - w.min ? r : w));
+          if (spread.max - spread.min > 1) warnings.push({ type: 'fade', kf: i, min: spread.min, max: spread.max });
+          const pointFn = m => {
+            const fadeMin = Math.max(0, rampOf(m).min - rampShift(m) / 60 + rampDelay(kfs[m]));
+            return picoPoint(kf, fadeMin * 60);
+          };
+          return {
+            json: anchorEntry(p.pred, rampShift, pointFn),
+            timeOn: d => anchorTime(p.pred, d, rampShift),
+            timeOnly: kfs[p.pred].trigger !== 'sun'
+          };
+        }
+        const fade = kf.mode === 'transition' ? kf.transitionSeconds : 0;
+        return {
+          json: timeEntry(i, ownShift(i), picoPoint(kf, fade)),
+          timeOn: d => (perDay[d][i] == null ? null : perDay[d][i] + ownShift(i) / 60),
+          timeOnly: kf.trigger !== 'sun'
+        };
+      };
+
+      const linear = kfs.map((kf, i) => i).filter(i =>
+        kfs[i].curve === 'sinus' && (kfs[i].mode === 'transition' || ramping(i)));
+      if (linear.length) warnings.push({ type: 'linear', kfs: linear });
+
+      // One entry per keyframe; a group with a priority rule becomes one composite
+      const entries = [];
+      const doneGroups = new Set();
+      kfs.forEach((kf, i) => {
+        const g = groupOf(i);
+        if (!g) { entries.push(ownEntry(i)); return; }
+        if (doneGroups.has(g.id)) return;
+        doneGroups.add(g.id);
+        const members = g.members.map(m => ({ m, e: ownEntry(m) }));
+        const shifts = new Set(g.members.map(m => (ramping(m) ? 'ramp' : ownShift(m))));
+        if (shifts.size > 1) warnings.push({ type: 'group', group: g.id });
+        entries.push({
+          json: { type: g.rule.toUpperCase(), entries: members.map(x => x.e.json) },
+          timeOn: d => {
+            const w = members.find(x => perDay[d][x.m] != null);
+            return w ? w.e.timeOn(d) : null;
+          },
+          timeOnly: members.every(x => x.e.timeOnly)
+        });
+      });
+
+      // The PICO expects each day's entries in chronological order. Sort by
+      // the median time of the year and report the days that break it.
+      // Local times wrap into the day like the PICO does; sun entries may run
+      // past midnight (their timestamp does, too).
+      const dayTime = (e, d) => {
+        const v = e.timeOn(d);
+        return v == null ? null : e.timeOnly ? ((v % 1440) + 1440) % 1440 : v;
+      };
+      entries.forEach(e => {
+        const values = [];
+        for (let d = 0; d < days; d++) { const v = dayTime(e, d); if (v != null) values.push(v); }
+        values.sort((a, b) => a - b);
+        e.key = values.length ? values[Math.floor(values.length / 2)] : Infinity;
+      });
+      entries.sort((a, b) => a.key - b.key);
+      const outOfOrder = [];
+      for (let d = 0; d < days; d++) {
+        let last = -Infinity;
+        for (const e of entries) {
+          const v = dayTime(e, d);
+          if (v == null) continue;
+          if (v < last) { outOfOrder.push(d); break; }
+          last = v;
+        }
+      }
+      if (outOfOrder.length) warnings.push({ type: 'order', days: outOfOrder, year });
+
+      return {
+        behavior: { type: 'DAILYSCHEDULER', entries: entries.map(e => e.json) },
+        entryCount: entries.length,
+        warnings
+      };
+    }
+
+    function picoWarningText(w) {
+      const num = i => `<strong>#${i + 1}</strong>`;
+      switch (w.type) {
+        case 'linear':
+          return t('pico_warn_linear').replace('{list}', w.kfs.map(num).join(', '));
+        case 'fade':
+          return t('pico_warn_fade').replace('{k}', num(w.kf))
+            .replace(/\{min\}/g, formatDuration(w.min)).replace('{max}', formatDuration(w.max));
+        case 'pred':
+          return t('pico_warn_pred').replace('{k}', num(w.kf)).replace('{p}', num(w.pred)).replace('{n}', w.days);
+        case 'substitute': {
+          const m = Math.round(w.seconds / 60);
+          return t('pico_warn_substitute').replace('{k}', num(w.kf))
+            .replace('{event}', t('sun_' + w.event)).replace('{base}', t('sun_' + w.base))
+            .replace('{offset}', `${m < 0 ? '−' : '+'}${Math.abs(m)} min`).replace('{dev}', Math.round(w.dev));
+        }
+        case 'group':
+          return t('pico_warn_group').replace('{g}', `<strong>${t('group')} ${w.group}</strong>`);
+        case 'order':
+          return t('pico_warn_order').replace('{n}', w.days.length).replace('{ranges}', formatDayRanges(w.days, w.year));
+        default:
+          return '';
+      }
+    }
+
+    function picoJsonText(result) {
+      return JSON.stringify(result.behavior, null, 2);
+    }
+
+    function renderPico() {
+      const details = document.getElementById('picoDetails');
+      if (!details.open) return;
+      const result = buildPicoScheduler();
+      const text = picoJsonText(result);
+      const loc = getLocation();
+      document.getElementById('picoOutput').value = text;
+      const intro = t('pico_intro')
+        .replace('{lat}', loc ? loc.lat.toFixed(4) : '–')
+        .replace('{lon}', loc ? loc.lon.toFixed(4) : '–');
+      const size = t('pico_size')
+        .replace('{n}', result.entryCount)
+        .replace('{kb}', (new Blob([text]).size / 1024).toFixed(1));
+      const warnings = result.warnings.map(picoWarningText).filter(Boolean);
+      document.getElementById('picoNotes').innerHTML = `
+        <p class="lkl-body-sm">${intro}</p>
+        <p class="lkl-body-sm">${size}</p>
+        ${warnings.length
+          ? `<div class="lkl-banner is-warn spaced hints"><strong>${t('pico_warn_title')}:</strong>
+               <ul>${warnings.map(w => `<li>${w}</li>`).join('')}</ul></div>`
+          : `<div class="lkl-banner spaced">${t('pico_no_warnings')}</div>`}`;
+    }
+
+    function downloadPico() {
+      const text = picoJsonText(buildPicoScheduler());
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = (state.scheduleName || 'My Schedule')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      a.download = `${safeName}-pico-dailyscheduler.json`;
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -4293,6 +4688,8 @@ const translations = {
     document.getElementById('fileInputTop').addEventListener('change', handleFileImport);
     document.getElementById('downloadJsonBtn').addEventListener('click', downloadJson);
     document.getElementById('downloadPdfBtn').addEventListener('click', downloadPdf);
+    document.getElementById('downloadPicoBtn').addEventListener('click', downloadPico);
+    document.getElementById('picoDetails').addEventListener('toggle', renderPico);
     document.getElementById('downloadCsvBtn').addEventListener('click', downloadCsv);
     document.getElementById('importFromTextBtn').addEventListener('click', importFromText);
 

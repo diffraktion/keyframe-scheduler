@@ -2,6 +2,11 @@
 
 ## Component
 
+### [Unreleased]
+
+#### Added
+- Web app: **PICO DailyScheduler** export — the schedule as the `DAILYSCHEDULER` behavior of a PICO lightnode `setup.json` (one entry per keyframe; sun triggers with offset, not-before/not-after bounds as nested `EARLIEST`/`LATEST`, groups as composites; solar midnight as noon −12 h, golden hour as sunrise/sunset + the year's mean distance). Preview with entry count, size and a list of differences from the simulation (linear fades instead of sine, fixed fade length of sun-anchored interpolations, changing predecessors, order changes during the year)
+
 ### [4.0.0-beta.1] - 2026-09-30 — not tested yet
 
 > Beta: not yet tested in a live Home Assistant installation. The light type timing defaults in particular still need to be validated.

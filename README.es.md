@@ -147,6 +147,12 @@ Tras la instalación aparece **Keyframe Scheduler** como entrada en la barra lat
 
 Idiomas disponibles: DE / EN / ES
 
+### Exportación para PICO lightnode
+
+**PICO DailyScheduler** (Exportar e importar) genera el behavior `DAILYSCHEDULER` para el `setup.json` de un PICO lightnode: pégalo en los `behaviors` de un target con space `TC`. Targets, behaviors de ajuste/override y destinations permanecen en el setup; coordenadas y zona horaria vienen de la configuración del PICO (`pico.latitude` / `pico.longitude`).
+
+Una entrada por keyframe mantiene el archivo pequeño: disparadores solares, desplazamiento, límites y grupos (`EARLIEST`/`LATEST`) se traducen 1:1. El PICO solo funde linealmente y con duración fija – las curvas sinusoidales se vuelven lineales y una interpolación ligada al sol usa la rampa más corta del año (el objetivo se alcanza antes y se mantiene). La vista de exportación lista cada diferencia con la simulación.
+
 ---
 
 ## Requisitos
