@@ -43,7 +43,8 @@ CONF_TYPE_OVERRIDES = "type_overrides"
 # instance (options) to what your installation handles.
 LIGHT_TYPES = {
     "dali":           {"max_transition": 90,   "min_interval": 30},
-    "dali2_extended": {"max_transition": 1620, "min_interval": 30},
+    # DALI-2 extended fade time ends at 16 min; no fade longer than 15 min
+    "dali2_extended": {"max_transition": 900,  "min_interval": 30},
     "casambi":        {"max_transition": 600,  "min_interval": 30},
     "zigbee":         {"max_transition": 600,  "min_interval": 15},
     "hue":            {"max_transition": 600,  "min_interval": 10},

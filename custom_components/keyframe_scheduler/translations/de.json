@@ -21,7 +21,7 @@
           "resume_mode": "Nach manueller Änderung wieder folgen",
           "resume_minutes": "Minuten bis zum Fortsetzen (bei „nach Minuten“)",
           "detect_non_ha_changes": "Auch Änderungen am Gerät erkennen (z. B. Wand-Dimmer am Bus)",
-          "adjust_types": "Zeiten der Leuchtentypen anpassen"
+          "adjust_types": "Zeiten der Leuchtentypen anpassen (erscheinen nach „Senden“ auf der letzten Seite)"
         }
       },
       "light_types": {

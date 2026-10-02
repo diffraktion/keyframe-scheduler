@@ -21,7 +21,7 @@
           "resume_mode": "Volver a seguir tras un cambio manual",
           "resume_minutes": "Minutos hasta reanudar (para “tras minutos”)",
           "detect_non_ha_changes": "Detectar también cambios en el dispositivo (p. ej. regulador de pared en el bus)",
-          "adjust_types": "Ajustar los tiempos de los tipos de luz"
+          "adjust_types": "Ajustar los tiempos de los tipos de luz (aparecen en la última página tras «Enviar»)"
         }
       },
       "light_types": {

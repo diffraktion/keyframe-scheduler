@@ -109,6 +109,8 @@ class KeyframeSchedulerOptionsFlow(config_entries.OptionsFlow):
                 if self._selected_lights:
                     return await self.async_step_light_types()
                 self._options[CONF_LIGHTS] = {}
+                if self._adjust_types:
+                    return await self.async_step_type_params()
                 return self.async_create_entry(title="", data=self._options)
 
         schema = vol.Schema(
@@ -185,8 +187,9 @@ class KeyframeSchedulerOptionsFlow(config_entries.OptionsFlow):
     async def async_step_type_params(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Fade limit and command interval of the light types in use."""
-        used_types = sorted(set(self._options.get(CONF_LIGHTS, {}).values()))
+        """Fade limit and command interval of the light types in use (of all
+        types while no light is assigned yet)."""
+        used_types = sorted(set(self._options.get(CONF_LIGHTS, {}).values())) or list(LIGHT_TYPES)
         overrides = dict(self._options.get(CONF_TYPE_OVERRIDES) or {})
 
         if user_input is not None:

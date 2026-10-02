@@ -15,6 +15,11 @@
 - Evaluation across midnight uses the real neighbouring days (web app `resolveTimeline`, integration `Evaluator.timeline_for`): the night after a differing evening follows that evening, and a day without keyframes holds the last value (as the PICO does). Previously the same day's list was wrapped onto itself
 - Coordinator: transitions of yesterday that run past midnight are stepped through as well
 
+#### Fixed
+- Options: "Adjust light type timings" was ignored when no light was selected (the dialog saved at once); it now opens the timings of all types. The label says that the timings follow on the last page
+- Light type "DALI-2 Extended Fade": longest fade 900 s instead of 1620 s — DALI-2 extended fade time ends at 16 min, and no DALI fade may exceed 15 min
+- Sidebar panel: `frontend` and `http` declared as dependencies; a failed panel registration is logged
+
 ### [4.0.0-beta.1] - 2026-09-30 — not tested yet
 
 > Beta: not yet tested in a live Home Assistant installation. The light type timing defaults in particular still need to be validated.

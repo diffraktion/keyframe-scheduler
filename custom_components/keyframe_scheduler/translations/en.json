@@ -21,7 +21,7 @@
           "resume_mode": "Follow again after a manual change",
           "resume_minutes": "Minutes until resuming (for “after minutes”)",
           "detect_non_ha_changes": "Also detect changes made at the device (e.g. wall dimmer on the bus)",
-          "adjust_types": "Adjust light type timings"
+          "adjust_types": "Adjust light type timings (shown on the last page after “Submit”)"
         }
       },
       "light_types": {

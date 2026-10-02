@@ -217,6 +217,10 @@ def lights_from_options(options: Mapping[str, Any]) -> Dict[str, str]:
     if isinstance(lights, dict):
         return {e: (t if t in LIGHT_TYPES else DEFAULT_LIGHT_TYPE) for e, t in lights.items()}
     legacy_max = options.get("max_transition_seconds")
+    # Up to 4.0.0b1 "DALI-2 Extended Fade" was offered with 1620 s; its limit
+    # is 900 s now (no DALI fade longer than 15 min)
+    if legacy_max == 1620:
+        return {e: "dali2_extended" for e in options.get(CONF_FOLLOW_LIGHTS) or []}
     legacy_type = next(
         (t for t, p in LIGHT_TYPES.items() if p["max_transition"] == legacy_max),
         DEFAULT_LIGHT_TYPE,
