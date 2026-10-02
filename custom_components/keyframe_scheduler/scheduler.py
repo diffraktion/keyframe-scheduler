@@ -451,6 +451,30 @@ class Evaluator:
 
         return self._evaluate_at_minutes(time_of_day, self.timeline_for(local.date()))
 
+    def next_breakpoint(self, when: datetime) -> Optional[datetime]:
+        """The next instant after `when` at which the curve may jump or bend:
+        a keyframe time, or the start / end of a transition window. Between
+        two breakpoints the curve is smooth (constant, a straight line or one
+        sine ramp) — the light control never fades across one.
+        """
+        local = self.local_now(when)
+        now_minutes = (
+            local.hour * 60
+            + local.minute
+            + (local.second + local.microsecond / 1_000_000) / 60.0
+        )
+        candidates: List[float] = []
+        for kf in self.timeline_for(local.date()):
+            minutes = kf_minutes(kf)
+            candidates.append(minutes)
+            if kf.mode == "transition" and kf.transition_seconds > 0:
+                duration = kf.transition_seconds / 60.0
+                candidates.append(minutes - duration if kf.transition_direction == "before" else minutes + duration)
+        later = [m for m in candidates if m > now_minutes + 1e-6]
+        if not later:
+            return None
+        return when + timedelta(minutes=min(later) - now_minutes)
+
     def _evaluate_at_minutes(
         self, time_minutes: float, keyframes: Tuple[Keyframe, ...]
     ) -> ScheduleValues:
@@ -500,6 +524,28 @@ class Evaluator:
             # After last keyframe - use first from next day
             first_kf = sorted_kf[0]
             next_kf = (first_kf, kf_minutes(first_kf) + 1440)
+
+        # A "before" transition of the NEXT keyframe starts ahead of its time
+        # and already runs while the previous keyframe is still current.
+        # Blend from the value at the window start to the next keyframe's
+        # value (web app: evaluateSchedule).
+        if next_kf is not None:
+            upcoming, upcoming_time = next_kf
+            if (
+                upcoming.mode == "transition"
+                and upcoming.transition_direction == "before"
+                and upcoming.transition_seconds > 0
+            ):
+                window_start = upcoming_time - upcoming.transition_seconds / 60.0
+                if time_minutes >= window_start:
+                    start = self._evaluate_at_minutes(window_start - 0.1, keyframes)
+                    t = clamp((time_minutes - window_start) / (upcoming_time - window_start), 0.0, 1.0)
+                    progress = ease_sinus(t) if upcoming.curve == "sinus" else t
+                    return ScheduleValues(
+                        kelvin=lerp(start.kelvin, upcoming.kelvin, progress),
+                        dim=lerp(start.dim, upcoming.dim, progress),
+                        transition_seconds=upcoming.transition_seconds,
+                    )
 
         # No previous keyframe - use default or next
         if prev_kf is None:
@@ -591,13 +637,19 @@ class Evaluator:
             transition_start = kf_time
             transition_end = kf_time + transition_duration
 
-        # Are we in the transition window?
+        # Are we in the transition window? Blend from the value just before
+        # the window to the keyframe's value, as the web app does
+        # (evaluateSchedule) — the light control follows this curve piece by
+        # piece, so it must be the real intermediate value, not the target.
         if transition_start <= current_time <= transition_end:
-            # Return target values immediately
-            # The integration provides the target, blueprint handles the transition
+            if transition_end <= transition_start:
+                return ScheduleValues(kelvin=kf.kelvin, dim=kf.dim, transition_seconds=kf.transition_seconds)
+            before = self._evaluate_at_minutes(transition_start - 0.1, keyframes)
+            t = (current_time - transition_start) / (transition_end - transition_start)
+            progress = ease_sinus(t) if kf.curve == "sinus" else t
             return ScheduleValues(
-                kelvin=kf.kelvin,
-                dim=kf.dim,
+                kelvin=lerp(before.kelvin, kf.kelvin, progress),
+                dim=lerp(before.dim, kf.dim, progress),
                 transition_seconds=kf.transition_seconds,
             )
 

@@ -222,6 +222,48 @@ class EvaluateTest(unittest.TestCase):
         self.assertEqual(dim_at(ev, date(2026, 3, 29), "06:59"), 10)
 
 
+class TransitionCurveTest(unittest.TestCase):
+    """Inside a transition window the evaluator returns the value on the way
+    (as the web app's simulation does) — the light control follows it."""
+
+    DAY = date(2026, 6, 15)
+
+    def ev(self, direction, curve="linear"):
+        return Evaluator(spec_from_dict(schedule([
+            kf("06:00", 3000, 20, "instant"),
+            kf("08:00", 5000, 100, "transition", curve=curve, transitionSeconds=3600, transitionDirection=direction),
+        ])))
+
+    def test_after_ramps_from_the_keyframe_time(self):
+        ev = self.ev("after")
+        self.assertEqual(dim_at(ev, self.DAY, "07:59"), 20)
+        self.assertEqual(dim_at(ev, self.DAY, "08:30"), 60)     # halfway
+        self.assertEqual(dim_at(ev, self.DAY, "09:00"), 100)
+        self.assertEqual(dim_at(ev, self.DAY, "10:00"), 100)
+
+    def test_before_ends_at_the_keyframe_time(self):
+        ev = self.ev("before")
+        self.assertEqual(dim_at(ev, self.DAY, "06:59"), 20)
+        self.assertEqual(dim_at(ev, self.DAY, "07:30"), 60)
+        self.assertEqual(dim_at(ev, self.DAY, "08:00"), 100)
+
+    def test_sine_curve(self):
+        ev = self.ev("after", "sinus")
+        self.assertEqual(dim_at(ev, self.DAY, "08:15"), 32)     # 20 + 80 * 0.146
+        self.assertEqual(dim_at(ev, self.DAY, "08:30"), 60)
+
+    def test_next_breakpoint(self):
+        ev = self.ev("before")
+        tz = ZoneInfo("Europe/Berlin")
+        at = lambda h, m: datetime(2026, 6, 15, h, m, tzinfo=tz)
+        self.assertEqual(ev.next_breakpoint(at(5, 0)), at(6, 0))     # keyframe
+        self.assertEqual(ev.next_breakpoint(at(6, 30)), at(7, 0))    # the transition window opens
+        self.assertEqual(ev.next_breakpoint(at(7, 30)), at(8, 0))    # ... and ends at the keyframe
+        self.assertEqual(ev.next_breakpoint(at(9, 0)), datetime(2026, 6, 16, 6, 0, tzinfo=tz))
+        self.assertEqual(self.ev("after").next_breakpoint(at(8, 30)), at(9, 0))
+        self.assertIsNone(Evaluator(spec_from_dict(schedule([]))).next_breakpoint(at(9, 0)))
+
+
 class ValidOnTest(unittest.TestCase):
     """Valid-on filters (the PICO's `days`): weekdays and a yearly period."""
 

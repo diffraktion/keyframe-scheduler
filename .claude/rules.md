@@ -40,6 +40,7 @@ The same rules live in JavaScript and Python — change both:
 | Valid on (weekdays, period) | `isValidOn` | `is_valid_on` |
 | Neighbouring days across midnight | `resolveTimeline` | `Evaluator.timeline_for` |
 | Transition follow-up (only the *immediately* next keyframe, its curve) | `evaluateSchedule` | `_evaluate_transition` |
+| Value inside a transition window (blend from the value before it) | `evaluateSchedule` | `_evaluate_transition`, `_evaluate_at_minutes` |
 
 Reference values (Berlin 21.06.: sunrise 04:43, sunset 21:33; 21.12.:
 08:15 / 15:54; DST day 29.03.) are asserted in `tests/test_scheduler.py`.
@@ -51,6 +52,9 @@ Reference values (Berlin 21.06.: sunrise 04:43, sunset 21:33; 21.12.:
   `own_contexts` — this is how our own state changes are recognised
 - Manual change = foreign context with user or parent; device reports only
   via deviation after the fade. Never treat `picolightnode` contexts as manual
+- Every light is paced by its own type — never by the strictest type of the
+  instance. A command's target is the curve at the end of its fade, never
+  the final value of a longer transition (the light would arrive early)
 - Respect the light type: fade ≤ `max_transition`, commands ≥ `min_interval`
   apart (defer, do not drop)
 - Decisions go into `light_logic.py` (testable), HA calls into `light_control.py`

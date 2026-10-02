@@ -56,7 +56,7 @@ Im nächsten Schritt bekommt jede Leuchte ihren **Typ**:
 | Typ | Max. Übergang | Min. Abstand zwischen Befehlen |
 |-----|---------------|--------------------------------|
 | DALI | 90 s | 30 s |
-| DALI-2 Extended Fade | 27 min | 30 s |
+| DALI-2 Extended Fade | 15 min | 30 s |
 | Casambi / Bluetooth Mesh | 10 min | 30 s |
 | Zigbee | 10 min | 15 s |
 | Philips Hue | 10 min | 10 s |
@@ -73,7 +73,8 @@ Beim Standort für Sonnen-Keyframes gilt: der Standort aus dem Zeitplan, sonst d
 
 - **Nur eingeschaltete Leuchten werden nachgeführt.** Die Integration schaltet nie selbst ein. Ausschalten am Wandschalter heißt „aus“.
 - **Beim Einschalten** (App, Wandschalter, Präsenzmelder …) übernimmt die Leuchte sofort den aktuellen Wert und folgt ab dann dem Zeitplan.
-- **Befehle** werden höchstens so oft gesendet, wie der Leuchtentyp erlaubt; ein Übergang ist nie länger als sein Maximum.
+- **Jede Leuchte läuft im Takt ihres eigenen Typs**, auch wenn mehrere Typen in einer Instanz stecken: Sie folgt der Kurve des Zeitplans in Fades, so lang ihr Typ erlaubt, und jeder endet auf der Kurve. Eine DALI-Leuchte bekommt etwa alle 90 s einen Befehl, eine Zigbee-Leuchte alle 10 min, eine DALI-2-Leuchte alle 15 min – für dieselbe Kurve. Lange Transitionen und Interpolationen sind deshalb nie zu früh am Ziel.
+- **Instant-Keyframes** schalten zu ihrer Zeit mit 1 s Überblendung.
 
 ### Manuelle Änderungen
 

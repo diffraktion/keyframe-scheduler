@@ -3155,7 +3155,8 @@ const translations = {
         
         if (timeMinutes >= transitionStart && timeMinutes <= transitionEnd) {
           // During transition
-          const t = (timeMinutes - transitionStart) / (transitionEnd - transitionStart);
+          // A transition of 0 s has no window: the keyframe's value at once
+          const t = transitionEnd > transitionStart ? (timeMinutes - transitionStart) / (transitionEnd - transitionStart) : 1;
           const progress = prevKf.curve === 'sinus' ? easeSinus(t) : t;
           
           const beforeValue = evaluateSchedule(transitionStart - 0.1, keyframes);

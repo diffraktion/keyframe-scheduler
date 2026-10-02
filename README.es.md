@@ -56,7 +56,7 @@ En el paso siguiente cada luz recibe su **tipo**:
 | Tipo | Transición máx. | Intervalo mín. entre comandos |
 |------|-----------------|-------------------------------|
 | DALI | 90 s | 30 s |
-| DALI-2 Extended Fade | 27 min | 30 s |
+| DALI-2 Extended Fade | 15 min | 30 s |
 | Casambi / Bluetooth Mesh | 10 min | 30 s |
 | Zigbee | 10 min | 15 s |
 | Philips Hue | 10 min | 10 s |
@@ -73,7 +73,8 @@ Ubicación para los keyframes solares: la del horario; si no la tiene, la config
 
 - **Solo se ajustan las luces encendidas.** La integración nunca enciende una luz. Apagar en el interruptor de pared significa «apagada».
 - **Al encenderla** (app, interruptor de pared, detector de presencia …) la luz toma de inmediato los valores actuales y sigue el horario desde ese momento.
-- **Los comandos** se envían como mucho con la frecuencia que permite el tipo de luz; un fundido nunca supera su máximo.
+- **Cada luz va al ritmo de su propio tipo**, también cuando varios tipos comparten una instancia: sigue la curva del horario en fundidos tan largos como permite su tipo, y cada uno termina sobre la curva. Una luz DALI recibe un comando cada 90 s aproximadamente, una Zigbee cada 10 min, una DALI-2 cada 15 min – para la misma curva. Por eso las transiciones e interpolaciones largas nunca terminan antes de tiempo.
+- **Los keyframes instantáneos** conmutan a su hora con un fundido de 1 s.
 
 ### Cambios manuales
 

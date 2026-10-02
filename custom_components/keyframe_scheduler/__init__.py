@@ -39,7 +39,7 @@ from .const import (
 )
 from .scheduler import Evaluator, Keyframe, kelvin_to_mired, kf_minutes, spec_from_dict
 from .light_control import PAUSE_MANUAL, KeyframeLightController
-from .light_logic import LightProfile, lights_from_options
+from .light_logic import lights_from_options
 from .store import ScheduleStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -510,13 +510,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to create evaluator: %s", err)
         return False
 
-    # Fade limit for the schedule ticks: the most restrictive assigned light
-    # type (without lights: the legacy instance option)
-    profiles = [LightProfile.for_type(t, controller_options["type_overrides"]) for t in lights.values()]
-    max_transition_seconds = (
-        min(p.max_transition for p in profiles) if profiles
-        else entry.options.get("max_transition_seconds", 300)
-    )
+    # Tick limit of the coordinator. It only feeds the sensors — the lights
+    # are driven by the controller, each at the pace of its own type.
+    max_transition_seconds = entry.options.get("max_transition_seconds", 300)
 
     # Create hybrid coordinator
     coordinator = HybridSchedulerCoordinator(

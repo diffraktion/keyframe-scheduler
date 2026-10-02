@@ -3,8 +3,10 @@ Keyframe Scheduler - direct light control.
 
 The integration drives its lights itself (no blueprint automation):
 
-- Every schedule update is sent to all assigned lights that are ON and
-  follow the schedule. The integration never switches a light on.
+- Every assigned light that is ON and follows the schedule is led along
+  the schedule's curve at its own pace (its own timer): fades as long as
+  its type allows, each one to the curve's value at the end of the fade.
+  The integration never switches a light on.
 - When a light is switched on (app, wall switch, presence ...) it gets the
   current values at once.
 - A change made by someone else pauses the light (its follow switch turns
@@ -19,9 +21,8 @@ The decisions themselves live in light_logic.py.
 from __future__ import annotations
 
 import logging
-import time
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, Deque, Dict, List, Optional
 
 from homeassistant.core import Context, Event, HomeAssistant, callback
@@ -42,7 +43,7 @@ from .light_logic import (
     group_members,
     is_manual_change,
     kelvin_range_from_state,
-    plan_command,
+    plan_step,
     should_resume,
 )
 
@@ -64,11 +65,11 @@ class ControlledLight:
         self.following = True
         self.pause_reason: Optional[str] = None
         self.paused_since: Optional[datetime] = None
-        # Per member: what was sent last; our own context ids
+        # Per member: what was sent last (wall-clock timestamps); our own context ids
         self.last_sent: Dict[str, SentCommand] = {}
         self.own_contexts: Deque[str] = deque(maxlen=50)
         self.switch: Any = None  # KeyframeFollowSwitch, set when it is added
-        self._deferred: Dict[str, Callable[[], None]] = {}
+        self._deferred: Dict[str, Callable[[], None]] = {}  # member -> cancel of its next step
         self._resume_timer: Optional[Callable[[], None]] = None
 
     def cancel_timers(self) -> None:
@@ -109,16 +110,13 @@ class KeyframeLightController:
         self._by_member: Dict[str, ControlledLight] = {}
         self._unsub: List[Callable[[], None]] = []
         self._unsub_state: Optional[Callable[[], None]] = None
+        self._evaluator: Any = None  # the schedule the lights currently run on
 
     # ---- setup ------------------------------------------------------------
 
-    @property
-    def max_transition(self) -> Optional[float]:
-        """Shortest fade limit among the assigned lights (drives the tick rate)."""
-        return min((l.profile.max_transition for l in self.lights.values()), default=None)
-
     async def async_start(self) -> None:
         self._refresh_members()
+        self._evaluator = getattr(self.coordinator, "evaluator", None)
         self._unsub.append(self.coordinator.async_add_listener(self._on_schedule_update))
         # Group members can appear late during startup: refresh once HA runs
         self._unsub.append(self.hass.bus.async_listen_once("homeassistant_started", self._on_started))
@@ -171,48 +169,78 @@ class KeyframeLightController:
             self._pause(light)
 
     # ---- sending ------------------------------------------------------------
+    #
+    # Every light (every member of a group) runs on its own timer: a step
+    # sends at most one command — a fade along the curve, as long as the
+    # light's type allows — and schedules the next step for when that fade
+    # ends (light_logic.plan_step). Lights of different types in one instance
+    # therefore get different fades and command rates for the same curve.
+
+    def _now(self) -> datetime:
+        return dt_util.now()
 
     @callback
     def _on_schedule_update(self) -> None:
         self._check_resume_next_keyframe()
-        self.hass.async_create_task(self.async_apply())
+        # A new schedule (set_schedule, options): start over on its curve.
+        # Otherwise only lights without a running timer need a step.
+        evaluator = getattr(self.coordinator, "evaluator", None)
+        replaced = evaluator is not self._evaluator
+        self._evaluator = evaluator
+        self.hass.async_create_task(self.async_apply(restart=replaced))
 
     async def async_apply(self, force: bool = False, only: Optional[List[str]] = None,
-                          transition: Optional[float] = None) -> None:
-        """Send the current schedule values to the lights that need them."""
-        data = self.coordinator.data
-        if not data:
-            return
+                          transition: Optional[float] = None, restart: bool = True) -> None:
+        """Bring the lights onto the schedule's curve.
+
+        force: send the current value even if nothing changed and within the
+        min interval (turn-on, resume, service). restart=False leaves lights
+        alone whose timer is already running.
+        """
         for light in self.lights.values():
             if only is not None and light.entity_id not in only:
                 continue
             if not light.following:
                 continue
             for member in light.members:
-                await self._apply_member(light, member, data, force, transition)
+                if not restart and not force and member in light._deferred:
+                    continue
+                await self._step(light, member, force, transition)
 
-    async def _apply_member(self, light: ControlledLight, member: str, data: Dict[str, Any],
-                            force: bool, transition: Optional[float]) -> None:
+    async def _step(self, light: ControlledLight, member: str, force: bool = False,
+                    catch_up: Optional[float] = None) -> None:
+        """One step for one light: send what the curve asks for now and set
+        the timer for the next step."""
+        cancel = light._deferred.pop(member, None)
+        if cancel:
+            cancel()
+        evaluator = getattr(self.coordinator, "evaluator", None)
         state = self.hass.states.get(member)
-        if state is None or state.state != "on":
-            return  # never switch a light on
-        plan = plan_command(
+        if evaluator is None or not light.following or state is None or state.state != "on":
+            return  # never switch a light on; a turn-on starts it again
+
+        now = self._now()
+
+        def curve(seconds: float):
+            values = evaluator.evaluate_at(now + timedelta(seconds=seconds))
+            return float(values.dim), float(values.kelvin)
+
+        breakpoint_at = evaluator.next_breakpoint(now)
+        step = plan_step(
             light.profile,
             light.last_sent.get(member),
-            float(data["brightness"]),
-            float(data["kelvin"]),
-            float(data["transition_seconds"] if transition is None else transition),
-            time.monotonic(),
+            now.timestamp(),
+            curve,
+            None if breakpoint_at is None else (breakpoint_at - now).total_seconds(),
             kelvin_range_from_state(state.attributes),
             force=force,
+            catch_up=TURN_ON_TRANSITION_SECONDS if catch_up is None else catch_up,
         )
-        if plan.action == "skip":
-            return
-        if plan.action == "wait":
-            self._defer(light, member, plan.wait_seconds)
+        self._schedule(light, member, step.next_in)
+        if step.action != "send":
             return
 
-        command = plan.command
+        command = step.command
         service_data: Dict[str, Any] = {
             "entity_id": member,
             "brightness_pct": command.brightness_pct,
@@ -223,29 +251,20 @@ class KeyframeLightController:
         context = Context()
         light.own_contexts.append(context.id)
         light.last_sent[member] = SentCommand(
-            at=time.monotonic(),
+            at=now.timestamp(),
             brightness_pct=command.brightness_pct,
             kelvin=command.kelvin,
             transition=command.transition,
         )
-        cancel = light._deferred.pop(member, None)
-        if cancel:
-            cancel()
         _LOGGER.debug("%s: %s", member, service_data)
         await self.hass.services.async_call("light", "turn_on", service_data, blocking=False, context=context)
 
-    def _defer(self, light: ControlledLight, member: str, seconds: float) -> None:
-        """Send the (then current) values once the light's min interval is over."""
-        if member in light._deferred:
-            return
-
+    def _schedule(self, light: ControlledLight, member: str, seconds: float) -> None:
+        """Run the light's next step in `seconds`."""
         @callback
         def _later(_now) -> None:
             light._deferred.pop(member, None)
-            if light.following and self.coordinator.data:
-                self.hass.async_create_task(
-                    self._apply_member(light, member, self.coordinator.data, False, None)
-                )
+            self.hass.async_create_task(self._step(light, member))
 
         light._deferred[member] = async_call_later(self.hass, max(1.0, seconds), _later)
 
@@ -262,6 +281,9 @@ class KeyframeLightController:
 
         if new.state != "on":
             light.last_sent.pop(entity_id, None)  # next turn-on gets a fresh command
+            cancel = light._deferred.pop(entity_id, None)
+            if cancel:
+                cancel()
             return
 
         if old is None or old.state != "on":
@@ -286,7 +308,7 @@ class KeyframeLightController:
             last_sent=light.last_sent.get(entity_id),
             reported_brightness_pct=brightness_pct_from_state(new.attributes),
             reported_kelvin=new.attributes.get("color_temp_kelvin"),
-            now=time.monotonic(),
+            now=self._now().timestamp(),
             detect_non_ha_changes=self.detect_non_ha_changes,
         ):
             _LOGGER.info("%s: manual change detected, pausing %s", entity_id, light.entity_id)

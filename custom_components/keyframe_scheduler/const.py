@@ -38,6 +38,9 @@ CONF_TYPE_OVERRIDES = "type_overrides"
 # max_transition: longest fade the hardware accepts in one command (seconds)
 # min_interval:   minimum time between two commands to the same light (seconds)
 #                 — protects slow buses (DALI, Bluetooth mesh) from flooding.
+# Every light is driven at its own pace: it follows the curve in pieces of at
+# most max_transition, each command fading to the curve's value at the end of
+# the piece (light_logic.plan_step).
 # The max_transition values are the hardware limits the integration has always
 # used; the min_interval values are conservative defaults — adjust them per
 # instance (options) to what your installation handles.
@@ -60,6 +63,10 @@ KELVIN_TOLERANCE = 150
 TRANSITION_GRACE_SECONDS = 10
 # Fade used when a light is switched on (or following is re-enabled)
 TURN_ON_TRANSITION_SECONDS = 1
+# A fade is a straight line: on a curved stretch (sine) it may leave the
+# curve by at most this much — otherwise the stretch is split further
+SEGMENT_BRIGHTNESS_TOLERANCE_PCT = 1.0
+SEGMENT_KELVIN_TOLERANCE = 30
 
 # Storage
 STORE_VERSION = 1

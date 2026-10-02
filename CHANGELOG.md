@@ -12,11 +12,14 @@
 - Web app: **PICO DailyScheduler** export — the schedule as the `DAILYSCHEDULER` behavior of a PICO lightnode `setup.json` (sun triggers with offset, not-before/not-after bounds as nested `EARLIEST`/`LATEST`, groups as composites; solar midnight as noon −12 h, golden hour as sunrise/sunset + the year's mean distance). Output selectable: **DALI** splits fades longer than 15 min into whole-minute pieces on the keyframe's curve and compensates the PICO's rounding of DALI fade times (exactly 900 s would become 16 min); **DMX / other** keeps one entry per keyframe. Preview with entry count, size and a list of differences from the simulation (linear fades instead of sine, fixed fade length of sun-anchored interpolations, changing predecessors, order changes during the year)
 
 #### Changed
+- **Light control: every light runs at the pace of its own type.** Lights of different types in one instance used to share the tick of the strictest type (a Zigbee light next to a DALI light got 90 s fades too). Now each light follows the curve on its own timer, in fades as long as its type allows; each command targets the curve's value at the end of its fade. Long transitions and interpolations no longer arrive early (the final value used to be sent with a clipped fade). Instant keyframes switch with a 1 s fade
+- Integration: inside a transition window the evaluator (and the sensors) return the value on the way — as the web app's simulation — instead of the target
 - Evaluation across midnight uses the real neighbouring days (web app `resolveTimeline`, integration `Evaluator.timeline_for`): the night after a differing evening follows that evening, and a day without keyframes holds the last value (as the PICO does). Previously the same day's list was wrapped onto itself
 - Coordinator: transitions of yesterday that run past midnight are stepped through as well
 
 #### Fixed
 - Options: "Adjust light type timings" was ignored when no light was selected (the dialog saved at once); it now opens the timings of all types. The label says that the timings follow on the last page
+- Web app: a transition of 0 s no longer divides by zero in the simulation
 - Light type "DALI-2 Extended Fade": longest fade 900 s instead of 1620 s — DALI-2 extended fade time ends at 16 min, and no DALI fade may exceed 15 min
 - Sidebar panel: `frontend` and `http` declared as dependencies; a failed panel registration is logged
 

@@ -5,7 +5,7 @@ Pure logic without Home Assistant imports, so it can be tested on its own.
 The HA side (light_control.py) gathers the facts — light state, context of
 a change, time — and asks these functions what to do:
 
-- plan_command:       send a command to a light now, later, or not at all?
+- plan_step:          what to send to a light now, and when to look at it again?
 - is_manual_change:   was a reported change made by someone else?
 - should_resume:      may a manually paused light follow again?
 """
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple
 
 try:
     from .const import (
@@ -26,7 +26,10 @@ try:
         LIGHT_TYPES,
         RESUME_AFTER_MINUTES,
         RESUME_NEXT_KEYFRAME,
+        SEGMENT_BRIGHTNESS_TOLERANCE_PCT,
+        SEGMENT_KELVIN_TOLERANCE,
         TRANSITION_GRACE_SECONDS,
+        TURN_ON_TRANSITION_SECONDS,
     )
 except ImportError:  # loaded outside the package (tests)
     from const import (  # type: ignore[no-redef]
@@ -38,7 +41,10 @@ except ImportError:  # loaded outside the package (tests)
         LIGHT_TYPES,
         RESUME_AFTER_MINUTES,
         RESUME_NEXT_KEYFRAME,
+        SEGMENT_BRIGHTNESS_TOLERANCE_PCT,
+        SEGMENT_KELVIN_TOLERANCE,
         TRANSITION_GRACE_SECONDS,
+        TURN_ON_TRANSITION_SECONDS,
     )
 
 # Context ids of PICOlightnode's internal updates (Smart Restore, MQTT sync)
@@ -76,45 +82,130 @@ class Command:
 
 
 @dataclass(frozen=True)
-class Plan:
-    """Result of plan_command: action is 'send', 'wait' or 'skip'."""
+class Step:
+    """Result of plan_step: what to do with one light now, and when to look
+    at it again. action is 'send', 'wait' (min interval) or 'idle'."""
     action: str
+    next_in: float
     command: Optional[Command] = None
-    wait_seconds: float = 0.0
 
 
-def plan_command(
-    profile: LightProfile,
-    last_sent: Optional[SentCommand],
+# The curve is sampled a hair before a breakpoint, so a jump AT the
+# breakpoint (instant keyframe) is not part of the fade towards it
+_BEFORE_BREAKPOINT = 0.05  # seconds
+# How long a light is left alone when nothing at all is coming up
+_IDLE_SECONDS = 3600.0
+
+# (brightness %, kelvin) of the schedule `seconds` from now
+Curve = Callable[[float], Tuple[float, float]]
+
+
+def build_command(
     brightness_pct: float,
     kelvin: float,
     transition: float,
-    now: float,
     kelvin_range: Optional[Tuple[float, float]],
-    force: bool = False,
-) -> Plan:
-    """Decide what to send to one light that is on and following.
-
-    - kelvin_range None: the light has no colour temperature -> brightness only
-    - the fade never exceeds the light type's max_transition
-    - within min_interval of the last command: wait (unless forced)
-    - nothing changed since the last command: skip (unless forced)
-    """
+) -> Command:
+    """A command for one light: kelvin clamped to its range, or left out for
+    a light without colour temperature (kelvin_range None)."""
     k: Optional[int] = None
     if kelvin_range is not None:
         lo, hi = kelvin_range
         k = int(round(min(max(kelvin, lo), hi)))
     bri = round(max(0.0, min(100.0, brightness_pct)), 1)
-    command = Command(brightness_pct=bri, kelvin=k, transition=max(0.0, min(transition, profile.max_transition)))
+    return Command(brightness_pct=bri, kelvin=k, transition=max(0.0, transition))
 
-    if force or last_sent is None:
-        return Plan("send", command)
-    if abs(last_sent.brightness_pct - bri) < 0.5 and (k is None or last_sent.kelvin is None or abs(last_sent.kelvin - k) < 10):
-        return Plan("skip")
-    elapsed = now - last_sent.at
-    if elapsed < profile.min_interval:
-        return Plan("wait", wait_seconds=profile.min_interval - elapsed)
-    return Plan("send", command)
+
+def _differs(last: SentCommand, command: Command, brightness: float, kelvin: float) -> bool:
+    if abs(last.brightness_pct - command.brightness_pct) >= brightness:
+        return True
+    return command.kelvin is not None and last.kelvin is not None and abs(last.kelvin - command.kelvin) >= kelvin
+
+
+def segment_length(curve: Curve, limit: float, floor: float) -> float:
+    """Longest fade <= limit over which a straight line stays on the curve.
+
+    Between two breakpoints the curve is a straight line or one sine ramp. A
+    sine ramp is halved until the quarter points of the piece lie on the
+    straight line within the tolerance — but never shorter than `floor`.
+    """
+    length = limit
+    while length / 2 >= floor:
+        b0, k0 = curve(0.0)
+        b1, k1 = curve(max(0.0, length - _BEFORE_BREAKPOINT))
+        straight = True
+        for f in (0.25, 0.5, 0.75):
+            b, k = curve(length * f)
+            if (
+                abs(b - (b0 + (b1 - b0) * f)) > SEGMENT_BRIGHTNESS_TOLERANCE_PCT
+                or abs(k - (k0 + (k1 - k0) * f)) > SEGMENT_KELVIN_TOLERANCE
+            ):
+                straight = False
+                break
+        if straight:
+            break
+        length /= 2
+    return length
+
+
+def plan_step(
+    profile: LightProfile,
+    last_sent: Optional[SentCommand],
+    now: float,
+    curve: Curve,
+    to_breakpoint: Optional[float],
+    kelvin_range: Optional[Tuple[float, float]],
+    force: bool = False,
+    catch_up: float = TURN_ON_TRANSITION_SECONDS,
+) -> Step:
+    """Decide what to send to one light that is on and following — at its
+    own pace, independent of the other lights of the instance.
+
+    The light follows the curve piece by piece: each command fades to the
+    value the curve has at the END of the piece, over the length of the piece.
+
+    - within min_interval of the last command: wait (unless forced)
+    - the light is not where the curve is (just switched on, resumed, an
+      instant keyframe fired): jump there with a short fade
+    - otherwise fade along the curve. A piece is at most the light type's
+      max_transition long, never crosses a breakpoint (`to_breakpoint`
+      seconds ahead, None = none known) and is shortened where the curve
+      bends (segment_length)
+    - nothing changes during the piece: idle — until the breakpoint if the
+      curve stays flat all the way
+    """
+    if last_sent is not None and not force:
+        elapsed = now - last_sent.at
+        if elapsed < profile.min_interval:
+            return Step("wait", profile.min_interval - elapsed)
+
+    brightness, kelvin = curve(0.0)
+    here = build_command(brightness, kelvin, catch_up, kelvin_range)
+    if force or last_sent is None or _differs(last_sent, here, BRIGHTNESS_TOLERANCE_PCT, KELVIN_TOLERANCE):
+        return Step("send", max(1.0, catch_up, profile.min_interval), here)
+
+    limit = profile.max_transition
+    if to_breakpoint is not None:
+        limit = min(limit, to_breakpoint)
+    limit = max(1.0, limit)
+    floor = min(limit, max(1.0, profile.min_interval))
+    length = segment_length(curve, limit, floor)
+    brightness, kelvin = curve(max(0.0, length - _BEFORE_BREAKPOINT))
+    command = build_command(brightness, kelvin, length, kelvin_range)
+    if _differs(last_sent, command, 0.5, 10):
+        return Step("send", length, command)
+
+    # Nothing to do for this piece. Sleep until the breakpoint if the curve
+    # stays where the light is, otherwise look again after the piece.
+    if to_breakpoint is None:
+        return Step("idle", _IDLE_SECONDS)
+    flat = all(
+        not _differs(last_sent, build_command(*curve(to_breakpoint * f), 0, kelvin_range), 0.5, 10)
+        for f in (0.25, 0.5, 0.75)
+    ) and not _differs(
+        last_sent, build_command(*curve(max(0.0, to_breakpoint - _BEFORE_BREAKPOINT)), 0, kelvin_range), 0.5, 10
+    )
+    return Step("idle", max(1.0, to_breakpoint if flat else length))
 
 
 def is_manual_change(

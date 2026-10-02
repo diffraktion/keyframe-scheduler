@@ -44,11 +44,15 @@ export JSON  ──────────────────────�
 
 ## Light control
 
-- **Sending:** on each coordinator update, for every light that follows and
-  every group member that is ON: `plan_command` decides send / wait (min
-  interval of the light type) / skip (unchanged). Fade = min(schedule
-  transition, type max_transition). Brightness only for lights without
-  colour temperature; kelvin clamped to the light's range.
+- **Sending:** every light (every group member that is ON) runs on its own
+  timer, independent of the coordinator and of the other lights. A step
+  (`plan_step`) fades to the curve's value at the END of the piece: at most the
+  type's `max_transition` long, never across a breakpoint
+  (`Evaluator.next_breakpoint`: keyframe time, transition start/end), halved
+  where the curve bends (sine). Off the curve (turn-on, resume, instant
+  keyframe): jump with a 1 s fade. Within `min_interval`: wait. Brightness
+  only for lights without colour temperature; kelvin clamped to the range.
+  The coordinator only feeds the sensors.
 - **Turn-on:** OFF→ON of a member → apply at once (1 s fade); a manual pause
   of that light ends.
 - **Manual change:** state change of an ON member whose context is not ours:

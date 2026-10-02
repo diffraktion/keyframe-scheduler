@@ -56,7 +56,7 @@ In the next step every light gets its **type**:
 | Type | Max. transition | Min. interval between commands |
 |------|-----------------|--------------------------------|
 | DALI | 90 s | 30 s |
-| DALI-2 Extended Fade | 27 min | 30 s |
+| DALI-2 Extended Fade | 15 min | 30 s |
 | Casambi / Bluetooth Mesh | 10 min | 30 s |
 | Zigbee | 10 min | 15 s |
 | Philips Hue | 10 min | 10 s |
@@ -73,7 +73,8 @@ Location for sun keyframes: the location from the schedule, otherwise the one co
 
 - **Only lights that are on are adjusted.** The integration never switches a light on. Switching off at the wall switch means “off”.
 - **When switched on** (app, wall switch, presence sensor …) the light takes the current values at once and follows the schedule from then on.
-- **Commands** are sent at most as often as the light type allows; a fade never exceeds its maximum.
+- **Every light runs at the pace of its own type**, also when several types share one instance: it follows the schedule's curve in fades as long as its type allows, each one ending on the curve. A DALI light gets a command about every 90 s, a Zigbee light every 10 min, a DALI-2 light every 15 min — for the same curve. Long transitions and interpolations are therefore never finished early.
+- **Instant keyframes** switch at their time with a 1 s fade.
 
 ### Manual changes
 
