@@ -8,7 +8,7 @@
   "config_flow": true,
   "iot_class": "local_polling",
   "requirements": [],
-  "dependencies": [],
+  "dependencies": ["frontend", "http"],
   "platforms": [
     "sensor",
     "switch"

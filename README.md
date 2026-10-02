@@ -144,7 +144,7 @@ Up to version 3.x a blueprint automation per light applied the values. The bluep
 
 ## Webapp
 
-After installation **Keyframe Scheduler** appears as a sidebar entry in Home Assistant. Direct URL: `http://<your-ha-host>/keyframe_scheduler/index.html`
+Once the first instance has been created (step 1), **Keyframe Scheduler** appears as a sidebar entry in Home Assistant — copying the folder alone is not enough. If the entry is still missing, reload the browser (Ctrl+F5). Direct URL: `http://<your-ha-host>/keyframe_scheduler/index.html`
 
 Available languages: DE / EN / ES
 

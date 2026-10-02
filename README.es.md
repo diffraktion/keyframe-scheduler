@@ -144,7 +144,7 @@ Hasta la versión 3.x una automatización de blueprint por luz aplicaba los valo
 
 ## Webapp
 
-Tras la instalación aparece **Keyframe Scheduler** como entrada en la barra lateral de Home Assistant. URL directa: `http://<tu-host-ha>/keyframe_scheduler/index.html`
+En cuanto se crea la primera instancia (paso 1), **Keyframe Scheduler** aparece como entrada en la barra lateral de Home Assistant; copiar la carpeta no basta. Si la entrada sigue sin aparecer, recarga el navegador (Ctrl+F5). URL directa: `http://<tu-host-ha>/keyframe_scheduler/index.html`
 
 Idiomas disponibles: DE / EN / ES
 

@@ -460,8 +460,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 require_admin=False,
             )
             hass.data[DOMAIN]["panel_registered"] = True
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.warning("Could not register the sidebar panel: %s", err)
 
     # Initialize store
     if "store" not in hass.data[DOMAIN]:

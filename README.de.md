@@ -144,7 +144,7 @@ Bis Version 3.x hat eine Blueprint-Automation pro Leuchte die Werte angewendet. 
 
 ## Webapp
 
-Nach der Installation erscheint **Keyframe Scheduler** als Sidebar-Eintrag in Home Assistant. Direkte URL: `http://<dein-ha-host>/keyframe_scheduler/index.html`
+Sobald die erste Instanz angelegt ist (Schritt 1), erscheint **Keyframe Scheduler** als Sidebar-Eintrag in Home Assistant – den Ordner zu kopieren genügt nicht. Fehlt der Eintrag danach noch, den Browser neu laden (Strg+F5). Direkte URL: `http://<dein-ha-host>/keyframe_scheduler/index.html`
 
 Verfügbare Sprachen: DE / EN / ES
 
