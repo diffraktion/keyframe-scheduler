@@ -124,6 +124,8 @@ class KeyframeSchedulerSensor(CoordinatorEntity, SensorEntity):
             "entry_id": self._entry.entry_id,
             "instance_name": self._entry.title,
             "transition_seconds": self.coordinator.data.get("transition_seconds"),
+            # When each keyframe fires today (sun keyframes and groups vary by day)
+            "keyframes_today": self.coordinator.data.get("keyframes_today"),
         }
 
     @property

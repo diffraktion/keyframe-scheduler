@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -19,16 +20,26 @@ from homeassistant.util import dt as dt_util
 from .const import (
     ATTR_ENTRY_ID,
     ATTR_FILE_PATH,
+    ATTR_MANUAL,
     ATTR_SCHEDULE,
+    CONF_DETECT_NON_HA_CHANGES,
+    CONF_RESUME_MINUTES,
+    CONF_RESUME_MODE,
+    CONF_TYPE_OVERRIDES,
     DEFAULT_DIM,
     DEFAULT_KELVIN,
     DEFAULT_STEP_MINUTES,
     DOMAIN,
     PLATFORMS,
+    RESUME_NEVER,
+    SERVICE_APPLY,
+    SERVICE_SET_MANUAL_CONTROL,
     SERVICE_SET_SCHEDULE,
     SERVICE_UPLOAD_FROM_FILE,
 )
-from .scheduler import Evaluator, kelvin_to_mired, spec_from_dict
+from .scheduler import Evaluator, Keyframe, kelvin_to_mired, kf_minutes, spec_from_dict
+from .light_control import PAUSE_MANUAL, KeyframeLightController
+from .light_logic import lights_from_options
 from .store import ScheduleStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +71,15 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
         
     async def async_setup(self):
         """Setup coordinator after init."""
+        await self.async_refresh()
+        self._schedule_next_update()
+
+    async def async_set_schedule(self, evaluator: Evaluator, spec) -> None:
+        """Switch to a new schedule in place — entities and the light
+        controller stay attached to this coordinator."""
+        self.evaluator = evaluator
+        self.spec = spec
+        self.user_step_seconds = spec.step_minutes * 60
         await self.async_refresh()
         self._schedule_next_update()
         
@@ -103,49 +123,72 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
         """Parse HH:MM to minutes."""
         h, m = map(int, time_str.split(':'))
         return h * 60 + m
-    
-    def _get_next_occurrence(self, time_str: str, after: datetime) -> datetime:
-        """Get next occurrence of HH:MM after datetime."""
-        target_minutes = self._parse_time(time_str)
-        
-        result = after.replace(
-            hour=target_minutes // 60,
-            minute=target_minutes % 60,
-            second=0,
-            microsecond=0
-        )
-        
-        if result <= after:
-            result += timedelta(days=1)
-        
+
+    @staticmethod
+    def _same_keyframe(a: Keyframe, b: Keyframe) -> bool:
+        """Same schedule entry, ignoring the (daily resolved) time."""
+        return replace(a, time="", minutes=None) == replace(b, time="", minutes=None)
+
+    def _occurrences(self, now: datetime) -> List[Tuple[Keyframe, datetime]]:
+        """Resolved keyframes of yesterday, today and tomorrow with their local
+        datetimes (yesterday: a transition may still run past midnight).
+
+        Sun keyframes, groups and valid-on filters make the firing times differ
+        from day to day, so every day is resolved on its own (see
+        scheduler.resolve_day).
+        """
+        local = self.evaluator.local_now(now)
+        result = []
+        for offset in (-1, 0, 1):
+            day = local.date() + timedelta(days=offset)
+            for kf in self.evaluator.keyframes_for(day):
+                h, m = map(int, kf.time.split(':'))
+                result.append((kf, datetime(day.year, day.month, day.day, h, m, tzinfo=local.tzinfo)))
+        result.sort(key=lambda o: o[1])
         return result
-    
+
+    def keyframe_times_between(self, start: datetime, end: datetime) -> List[datetime]:
+        """Firing times of all keyframes in (start, end] — used to resume a
+        manually paused light at the next keyframe."""
+        s = self.evaluator.local_now(start)
+        e = self.evaluator.local_now(end)
+        times = []
+        day = s.date()
+        while day <= e.date():
+            for kf in self.evaluator.keyframes_for(day):
+                h, m = map(int, kf.time.split(':'))
+                dt = datetime(day.year, day.month, day.day, h, m, tzinfo=s.tzinfo)
+                if start < dt <= end:
+                    times.append(dt)
+            day += timedelta(days=1)
+        return times
+
     def _find_keyframe_segment(self, now: datetime):
-        """Find previous and next keyframe."""
-        sorted_kf = sorted(self.spec.keyframes, key=lambda k: self._parse_time(k.time))
-        now_minutes = now.hour * 60 + now.minute
-        
+        """Previous and next keyframe around now, on today's timeline (which
+        holds the neighbouring days with keyframes, see Evaluator.timeline_for)."""
+        local = self.evaluator.local_now(now)
+        timeline = self.evaluator.timeline_for(local.date())
+        sorted_kf = sorted(timeline, key=kf_minutes)
+        now_minutes = local.hour * 60 + local.minute
+
         prev_kf = None
         next_kf = None
-        
+
         for kf in reversed(sorted_kf):
-            kf_minutes = self._parse_time(kf.time)
-            if kf_minutes <= now_minutes:
+            if kf_minutes(kf) <= now_minutes:
                 prev_kf = kf
                 break
-        
+
         for kf in sorted_kf:
-            kf_minutes = self._parse_time(kf.time)
-            if kf_minutes > now_minutes:
+            if kf_minutes(kf) > now_minutes:
                 next_kf = kf
                 break
         
-        # Wrap around
-        if self.spec.wrap_around:
-            if not prev_kf and sorted_kf:
-                prev_kf = sorted_kf[-1]
-            if not next_kf and sorted_kf:
-                next_kf = sorted_kf[0]
+        # Wrap around midnight (every schedule is a daily profile)
+        if not prev_kf and sorted_kf:
+            prev_kf = sorted_kf[-1]
+        if not next_kf and sorted_kf:
+            next_kf = sorted_kf[0]
         
         return prev_kf, next_kf
     
@@ -208,13 +251,12 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
     def _calculate_next_update_time(self, now: datetime) -> Optional[datetime]:
         """Calculate next update time."""
         events = []
-        
-        sorted_kf = sorted(self.spec.keyframes, key=lambda k: self._parse_time(k.time))
-        
-        # Transition events
-        for kf in sorted_kf:
-            kf_dt = self._get_next_occurrence(kf.time, now)
-            
+
+        occurrences = self._occurrences(now)
+
+        # Transition events (today's occurrence covers a transition that is
+        # already running, tomorrow's the next one)
+        for kf, kf_dt in occurrences:
             trans_events = self._calculate_transition_events(kf, kf_dt, now)
             events.extend(trans_events)
             
@@ -241,9 +283,16 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
                 # After transition ends, interpolate to next keyframe if it's interpolate mode
                 should_interpolate = True
         
+        next_kf_dt = None
         if should_interpolate:
-            next_kf_dt = self._get_next_occurrence(next_kf.time, now)
-            
+            next_kf_dt = next(
+                (dt for kf, dt in occurrences if dt > now and self._same_keyframe(kf, next_kf)),
+                None,
+            )
+            should_interpolate = next_kf_dt is not None
+
+        if should_interpolate:
+
             # CRITICAL: Adjust interval based on hardware limits!
             # If hardware max is less than user's stepMinutes, use hardware max
             # to avoid flickering from interrupted transitions
@@ -341,13 +390,26 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
             )
         
         kelvin_int = int(round(values.kelvin))
-        
+
+        # Today's firing times, e.g. ["06:00", "19:29 (sunset +30 min)"]
+        keyframes_today = []
+        for kf in sorted(
+            self.evaluator.keyframes_for(self.evaluator.local_now(now).date()),
+            key=lambda k: self._parse_time(k.time),
+        ):
+            label = kf.time
+            if kf.trigger == "sun":
+                offset = f" {kf.offset_minutes:+d} min" if kf.offset_minutes else ""
+                label += f" ({kf.sun_event}{offset})"
+            keyframes_today.append(label)
+
         return {
             "kelvin": kelvin_int,
             "mired": kelvin_to_mired(kelvin_int),
             "brightness": float(values.dim),
             "transition_seconds": int(transition_seconds),
             "next_change": next_update or (now + timedelta(seconds=self.user_step_seconds)),
+            "keyframes_today": keyframes_today,
         }
     
     async def async_shutdown(self):
@@ -359,6 +421,14 @@ class HybridSchedulerCoordinator(DataUpdateCoordinator):
 
 _PANEL_URL_PATH = "keyframe-scheduler"
 _STATIC_URL_PATH = "/keyframe_scheduler"
+
+
+def _home_location(hass: HomeAssistant) -> Optional[Tuple[float, float]]:
+    """Home location configured in HA — used for sun keyframes when the
+    schedule file carries no location of its own."""
+    if hass.config.latitude is None or hass.config.longitude is None:
+        return None
+    return (float(hass.config.latitude), float(hass.config.longitude))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -390,8 +460,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 require_admin=False,
             )
             hass.data[DOMAIN]["panel_registered"] = True
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.warning("Could not register the sidebar panel: %s", err)
 
     # Initialize store
     if "store" not in hass.data[DOMAIN]:
@@ -419,22 +489,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "timezone": hass.config.time_zone or "Europe/Berlin",
             "stepMinutes": DEFAULT_STEP_MINUTES,
             "horizonHours": 48,
-            "wrapAround": True,
-            "startDateTime": None,
             "keyframes": [],
         }
         await store.async_set(entry.entry_id, schedule_dict)
 
-    # Get hardware limits from options
-    max_transition_seconds = entry.options.get("max_transition_seconds", 300)
+    # Lights controlled by this instance (with their type) and control options
+    lights = lights_from_options(entry.options)
+    controller_options = dict(
+        type_overrides=entry.options.get(CONF_TYPE_OVERRIDES) or {},
+        resume_mode=entry.options.get(CONF_RESUME_MODE, RESUME_NEVER),
+        resume_minutes=float(entry.options.get(CONF_RESUME_MINUTES, 0) or 0),
+        detect_non_ha_changes=bool(entry.options.get(CONF_DETECT_NON_HA_CHANGES, True)),
+    )
 
     # Create evaluator
     try:
-        spec = spec_from_dict(schedule_dict)
+        spec = spec_from_dict(schedule_dict, _home_location(hass))
         evaluator = Evaluator(spec, DEFAULT_KELVIN, DEFAULT_DIM)
     except Exception as err:
         _LOGGER.error("Failed to create evaluator: %s", err)
         return False
+
+    # Tick limit of the coordinator. It only feeds the sensors — the lights
+    # are driven by the controller, each at the pace of its own type.
+    max_transition_seconds = entry.options.get("max_transition_seconds", 300)
 
     # Create hybrid coordinator
     coordinator = HybridSchedulerCoordinator(
@@ -448,157 +526,148 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Setup coordinator
     await coordinator.async_setup()
 
+    controller = KeyframeLightController(hass, coordinator, lights, **controller_options)
+
     # Store
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "evaluator": evaluator,
+        "controller": controller,
         "schedule": schedule_dict,
         "title": entry.title,
     }
 
-    # Register service (only once)
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_SCHEDULE):
+    _async_register_services(hass)
 
-        async def handle_set_schedule(call: ServiceCall) -> None:
-            """Handle set_schedule service call."""
-            entry_id = call.data.get(ATTR_ENTRY_ID)
-            schedule = call.data.get(ATTR_SCHEDULE)
-
-            if not entry_id:
-                raise ValueError("entry_id is required")
-
-            # Parse schedule
-            if isinstance(schedule, str):
-                schedule_obj = json.loads(schedule)
-            elif isinstance(schedule, dict):
-                schedule_obj = schedule
-            else:
-                raise ValueError("schedule must be a dict or JSON string")
-
-            # Validate
-            try:
-                spec = spec_from_dict(schedule_obj)
-            except Exception as err:
-                raise ValueError(f"Invalid schedule: {err}") from err
-
-            # Save
-            store = hass.data[DOMAIN]["store"]
-            await store.async_set(entry_id, schedule_obj)
-
-            # Update
-            if entry_id in hass.data[DOMAIN]:
-                # Recreate evaluator
-                new_evaluator = Evaluator(spec, DEFAULT_KELVIN, DEFAULT_DIM)
-                
-                # Get hardware limit
-                entry = hass.config_entries.async_get_entry(entry_id)
-                max_trans = entry.options.get("max_transition_seconds", 300) if entry else 300
-                
-                # Recreate coordinator
-                new_coordinator = HybridSchedulerCoordinator(
-                    hass,
-                    evaluator=new_evaluator,
-                    spec=spec,
-                    name=hass.data[DOMAIN][entry_id]["coordinator"].name,
-                    max_transition_seconds=max_trans,
-                )
-                
-                # Shutdown old
-                old_coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
-                await old_coordinator.async_shutdown()
-                
-                # Setup new
-                await new_coordinator.async_setup()
-                
-                # Store
-                hass.data[DOMAIN][entry_id]["coordinator"] = new_coordinator
-                hass.data[DOMAIN][entry_id]["evaluator"] = new_evaluator
-                hass.data[DOMAIN][entry_id]["schedule"] = schedule_obj
-
-            _LOGGER.info("Schedule updated for entry %s", entry_id)
-
-        async def handle_upload_from_file(call: ServiceCall) -> None:
-            """Handle upload_from_file service call - reads JSON from file system."""
-            entry_id = call.data.get(ATTR_ENTRY_ID)
-            file_path = call.data.get(ATTR_FILE_PATH)
-
-            if not entry_id:
-                raise ValueError("entry_id is required")
-            
-            if not file_path:
-                raise ValueError("file_path is required")
-
-            # Read file
-            try:
-                _LOGGER.info("Reading schedule from file: %s", file_path)
-                
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
-                
-                # Remove BOM if present
-                if file_content.startswith('\ufeff'):
-                    file_content = file_content[1:]
-                
-                # Parse JSON
-                schedule_obj = json.loads(file_content)
-                
-            except FileNotFoundError:
-                raise ValueError(f"File not found: {file_path}") from None
-            except PermissionError:
-                raise ValueError(f"Permission denied reading file: {file_path}") from None
-            except json.JSONDecodeError as err:
-                raise ValueError(
-                    f"Invalid JSON in file at line {err.lineno}, column {err.colno}: {err.msg}"
-                ) from err
-            except Exception as err:
-                raise ValueError(f"Error reading file: {err}") from err
-
-            # Validate schedule
-            try:
-                spec = spec_from_dict(schedule_obj)
-            except Exception as err:
-                raise ValueError(f"Invalid schedule format: {err}") from err
-
-            # Save to store
-            store = hass.data[DOMAIN]["store"]
-            await store.async_set(entry_id, schedule_obj)
-
-            # Update instance (same logic as set_schedule)
-            if entry_id in hass.data[DOMAIN]:
-                new_evaluator = Evaluator(spec, DEFAULT_KELVIN, DEFAULT_DIM)
-                
-                entry = hass.config_entries.async_get_entry(entry_id)
-                max_trans = entry.options.get("max_transition_seconds", 300) if entry else 300
-                
-                new_coordinator = HybridSchedulerCoordinator(
-                    hass,
-                    evaluator=new_evaluator,
-                    spec=spec,
-                    name=hass.data[DOMAIN][entry_id]["coordinator"].name,
-                    max_transition_seconds=max_trans,
-                )
-                
-                old_coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
-                await old_coordinator.async_shutdown()
-                
-                await new_coordinator.async_setup()
-                
-                hass.data[DOMAIN][entry_id]["coordinator"] = new_coordinator
-                hass.data[DOMAIN][entry_id]["evaluator"] = new_evaluator
-                hass.data[DOMAIN][entry_id]["schedule"] = schedule_obj
-
-            _LOGGER.info("Schedule uploaded from file %s for entry %s", file_path, entry_id)
-
-        hass.services.async_register(DOMAIN, SERVICE_SET_SCHEDULE, handle_set_schedule)
-        hass.services.async_register(DOMAIN, SERVICE_UPLOAD_FROM_FILE, handle_upload_from_file)
-
-    # Reload when options change (e.g. follow_lights list updated)
+    # Reload when options change (lights, types, resume mode, schedule)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    # Forward to platforms
+    # Forward to platforms (the follow switches register with the controller)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await controller.async_start()
 
     return True
+
+
+async def _async_replace_schedule(hass: HomeAssistant, entry_id: str, schedule_obj: Dict[str, Any]) -> None:
+    """Validate, store and activate a new schedule for an instance."""
+    try:
+        spec = spec_from_dict(schedule_obj, _home_location(hass))
+    except Exception as err:
+        raise ValueError(f"Invalid schedule: {err}") from err
+
+    store = hass.data[DOMAIN]["store"]
+    await store.async_set(entry_id, schedule_obj)
+
+    if entry_id in hass.data[DOMAIN]:
+        data = hass.data[DOMAIN][entry_id]
+        evaluator = Evaluator(spec, DEFAULT_KELVIN, DEFAULT_DIM)
+        await data["coordinator"].async_set_schedule(evaluator, spec)
+        data["evaluator"] = evaluator
+        data["schedule"] = schedule_obj
+
+
+def _controlled_entities(hass: HomeAssistant, call: ServiceCall):
+    """(controller, light entity_id) pairs a service call refers to."""
+    entry_id = call.data.get(ATTR_ENTRY_ID)
+    wanted = call.data.get("entity_id")
+    if isinstance(wanted, str):
+        wanted = [wanted]
+    for key, data in hass.data[DOMAIN].items():
+        if not isinstance(data, dict) or "controller" not in data:
+            continue
+        if entry_id and key != entry_id:
+            continue
+        controller = data["controller"]
+        for light_id in controller.lights:
+            if not wanted or light_id in wanted:
+                yield controller, light_id
+
+
+def _async_register_services(hass: HomeAssistant) -> None:
+    """Register the services once for all instances."""
+    if hass.services.has_service(DOMAIN, SERVICE_SET_SCHEDULE):
+        return
+
+    async def handle_set_schedule(call: ServiceCall) -> None:
+        """Handle set_schedule service call."""
+        entry_id = call.data.get(ATTR_ENTRY_ID)
+        schedule = call.data.get(ATTR_SCHEDULE)
+
+        if not entry_id:
+            raise ValueError("entry_id is required")
+
+        # Parse schedule
+        if isinstance(schedule, str):
+            schedule_obj = json.loads(schedule)
+        elif isinstance(schedule, dict):
+            schedule_obj = schedule
+        else:
+            raise ValueError("schedule must be a dict or JSON string")
+
+        await _async_replace_schedule(hass, entry_id, schedule_obj)
+        _LOGGER.info("Schedule updated for entry %s", entry_id)
+
+    async def handle_upload_from_file(call: ServiceCall) -> None:
+        """Handle upload_from_file service call - reads JSON from file system."""
+        entry_id = call.data.get(ATTR_ENTRY_ID)
+        file_path = call.data.get(ATTR_FILE_PATH)
+
+        if not entry_id:
+            raise ValueError("entry_id is required")
+
+        if not file_path:
+            raise ValueError("file_path is required")
+
+        # Read file
+        try:
+            _LOGGER.info("Reading schedule from file: %s", file_path)
+
+            def _read() -> str:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+
+            file_content = await hass.async_add_executor_job(_read)
+
+            # Remove BOM if present
+            if file_content.startswith(chr(0xFEFF)):
+                file_content = file_content[1:]
+
+            # Parse JSON
+            schedule_obj = json.loads(file_content)
+
+        except FileNotFoundError:
+            raise ValueError(f"File not found: {file_path}") from None
+        except PermissionError:
+            raise ValueError(f"Permission denied reading file: {file_path}") from None
+        except json.JSONDecodeError as err:
+            raise ValueError(
+                f"Invalid JSON in file at line {err.lineno}, column {err.colno}: {err.msg}"
+            ) from err
+        except Exception as err:
+            raise ValueError(f"Error reading file: {err}") from err
+
+        await _async_replace_schedule(hass, entry_id, schedule_obj)
+        _LOGGER.info("Schedule uploaded from file %s for entry %s", file_path, entry_id)
+
+    async def handle_apply(call: ServiceCall) -> None:
+        """Send the current schedule values to lights now (paused lights stay paused)."""
+        by_controller: Dict[Any, List[str]] = {}
+        for controller, light_id in _controlled_entities(hass, call):
+            by_controller.setdefault(controller, []).append(light_id)
+        for controller, light_ids in by_controller.items():
+            await controller.async_apply(force=True, only=light_ids)
+
+    async def handle_set_manual_control(call: ServiceCall) -> None:
+        """Pause (manual: true) or resume (manual: false) following for lights."""
+        manual = bool(call.data.get(ATTR_MANUAL, True))
+        for controller, light_id in _controlled_entities(hass, call):
+            controller.set_following(light_id, not manual, PAUSE_MANUAL if manual else None)
+
+    hass.services.async_register(DOMAIN, SERVICE_SET_SCHEDULE, handle_set_schedule)
+    hass.services.async_register(DOMAIN, SERVICE_UPLOAD_FROM_FILE, handle_upload_from_file)
+    hass.services.async_register(DOMAIN, SERVICE_APPLY, handle_apply)
+    hass.services.async_register(DOMAIN, SERVICE_SET_MANUAL_CONTROL, handle_set_manual_control)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -608,10 +677,11 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Shutdown coordinator
+    # Stop controlling lights, shutdown coordinator
     if entry.entry_id in hass.data[DOMAIN]:
-        coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-        await coordinator.async_shutdown()
+        data = hass.data[DOMAIN][entry.entry_id]
+        await data["controller"].async_stop()
+        await data["coordinator"].async_shutdown()
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 

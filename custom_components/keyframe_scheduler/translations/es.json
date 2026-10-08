@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configurar Keyframe Scheduler",
-        "description": "Crear una nueva instancia de Keyframe Scheduler",
+        "description": "Crear una nueva instancia de Keyframe Scheduler – una instancia es un horario para cualquier número de luces.",
         "data": {
           "name": "Nombre de la instancia"
         }
@@ -13,20 +13,66 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configurar horario y hardware",
-        "description": "📁 Pasos:\n1. En la webapp: hacer clic en '⬇️ Guardar como archivo'\n2. Abrir el archivo con un editor de texto (Notepad, TextEdit, etc.)\n3. Copiar el contenido (Ctrl+A, Ctrl+C)\n4. Pegarlo aquí (Ctrl+V)\n\n⚙️ Tipo de hardware: determina el tiempo máximo de transición para tus luces",
+        "title": "Horario y luces",
+        "description": "Horario: en la webapp pulsa '⬇️ Guardar como archivo', abre el archivo en un editor de texto y pega aquí su contenido.\n\nLuces: la integración controla ella misma las luces seleccionadas – solo mientras están encendidas, nunca las enciende. Al encenderlas toman de inmediato los valores actuales.\n\nCambio manual (app, escena, pulsador): la luz se pausa. Apagarla y encenderla de nuevo siempre la reanuda.",
         "data": {
-          "schedule_json": "Pegar JSON del horario",
-          "hardware_type": "Tipo de hardware",
-          "custom_max_transition": "Transición máxima personalizada (segundos)",
-          "follow_lights": "Luces a seguir"
+          "schedule_json": "Pegar JSON del horario (vacío = sin cambios)",
+          "lights": "Luces (también grupos)",
+          "resume_mode": "Volver a seguir tras un cambio manual",
+          "resume_minutes": "Minutos hasta reanudar (para “tras minutos”)",
+          "detect_non_ha_changes": "Detectar también cambios en el dispositivo (p. ej. regulador de pared en el bus)",
+          "adjust_types": "Ajustar los tiempos de los tipos de luz (aparecen en la última página tras «Enviar»)"
+        }
+      },
+      "light_types": {
+        "title": "Tipos de luz",
+        "description": "El tipo fija la transición más larga por comando y la frecuencia de los comandos. Grupos: el tipo se aplica a todos los miembros."
+      },
+      "type_params": {
+        "title": "Tiempos de los tipos de luz",
+        "description": "Transición máx. = fundido más largo por comando. Intervalo mín. = tiempo más corto entre dos comandos a la misma luz. Los valores por defecto son prudentes – ajústalos a tu instalación.",
+        "data": {
+          "dali_max_transition": "DALI: transición máx.",
+          "dali_min_interval": "DALI: intervalo mín. entre comandos",
+          "dali2_extended_max_transition": "DALI-2 Extended Fade: transición máx.",
+          "dali2_extended_min_interval": "DALI-2 Extended Fade: intervalo mín. entre comandos",
+          "casambi_max_transition": "Casambi / Bluetooth Mesh: transición máx.",
+          "casambi_min_interval": "Casambi / Bluetooth Mesh: intervalo mín. entre comandos",
+          "zigbee_max_transition": "Zigbee: transición máx.",
+          "zigbee_min_interval": "Zigbee: intervalo mín. entre comandos",
+          "hue_max_transition": "Philips Hue: transición máx.",
+          "hue_min_interval": "Philips Hue: intervalo mín. entre comandos",
+          "zwave_max_transition": "Z-Wave: transición máx.",
+          "zwave_min_interval": "Z-Wave: intervalo mín. entre comandos",
+          "generic_max_transition": "Generic / WLAN: transición máx.",
+          "generic_min_interval": "Generic / WLAN: intervalo mín. entre comandos"
         }
       }
     },
     "error": {
-      "invalid_json": "Formato JSON inválido — revisar el contenido del archivo",
-      "invalid_schedule": "Datos de horario inválidos — revisar los keyframes",
-      "invalid_file": "No se pudo leer el archivo — intentar pegado manual"
+      "invalid_json": "Formato JSON no válido — revisa el contenido del archivo",
+      "invalid_schedule": "Datos de horario no válidos — revisa los keyframes",
+      "invalid_file": "No se pudo leer el archivo — prueba a pegarlo manualmente"
+    }
+  },
+  "selector": {
+    "light_type": {
+      "options": {
+        "dali": "DALI (max. 90 s)",
+        "dali2_extended": "DALI-2 Extended Fade (max. 27 min)",
+        "casambi": "Casambi / Bluetooth Mesh (max. 10 min)",
+        "zigbee": "Zigbee (max. 10 min)",
+        "hue": "Philips Hue (max. 10 min)",
+        "zwave": "Z-Wave (max. 5 min)",
+        "generic": "Generic / WLAN (max. 5 min)"
+      }
+    },
+    "resume_mode": {
+      "options": {
+        "never": "Solo apagando/encendiendo o con el interruptor de seguimiento",
+        "minutes": "Tras un número de minutos",
+        "next_keyframe": "En el siguiente keyframe"
+      }
     }
   }
 }

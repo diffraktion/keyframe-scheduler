@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Set up Keyframe Scheduler",
-        "description": "Create a new Keyframe Scheduler instance",
+        "description": "Create a new Keyframe Scheduler instance – one instance is one schedule for any number of lights.",
         "data": {
           "name": "Instance name"
         }
@@ -13,13 +13,39 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure Schedule & Hardware",
-        "description": "📁 Workflow:\n1. In webapp: click '⬇️ Save as file'\n2. Open file with a text editor (Notepad, TextEdit, etc.)\n3. Copy content (Ctrl+A, Ctrl+C)\n4. Paste here (Ctrl+V)\n\n⚙️ Hardware type: determines the maximum transition time for your lights",
+        "title": "Schedule & lights",
+        "description": "Schedule: in the webapp click '⬇️ Save as file', open the file in a text editor and paste its content here.\n\nLights: the integration controls the selected lights itself – only while they are on, it never switches them on. When switched on they take the current values at once.\n\nManual change (app, scene, switch): the light pauses. Switching it off and on again always resumes.",
         "data": {
-          "schedule_json": "Paste schedule JSON",
-          "hardware_type": "Hardware type",
-          "custom_max_transition": "Custom max transition (seconds)",
-          "follow_lights": "Follow lights"
+          "schedule_json": "Paste schedule JSON (empty = unchanged)",
+          "lights": "Lights (groups too)",
+          "resume_mode": "Follow again after a manual change",
+          "resume_minutes": "Minutes until resuming (for “after minutes”)",
+          "detect_non_ha_changes": "Also detect changes made at the device (e.g. wall dimmer on the bus)",
+          "adjust_types": "Adjust light type timings (shown on the last page after “Submit”)"
+        }
+      },
+      "light_types": {
+        "title": "Light types",
+        "description": "The type sets the longest fade per command and how often commands are sent. Groups: the type applies to all members."
+      },
+      "type_params": {
+        "title": "Light type timings",
+        "description": "Max. transition = longest fade per command. Min. interval = shortest time between two commands to the same light. The defaults are conservative – adjust them to your installation.",
+        "data": {
+          "dali_max_transition": "DALI: max. transition",
+          "dali_min_interval": "DALI: min. interval between commands",
+          "dali2_extended_max_transition": "DALI-2 Extended Fade: max. transition",
+          "dali2_extended_min_interval": "DALI-2 Extended Fade: min. interval between commands",
+          "casambi_max_transition": "Casambi / Bluetooth Mesh: max. transition",
+          "casambi_min_interval": "Casambi / Bluetooth Mesh: min. interval between commands",
+          "zigbee_max_transition": "Zigbee: max. transition",
+          "zigbee_min_interval": "Zigbee: min. interval between commands",
+          "hue_max_transition": "Philips Hue: max. transition",
+          "hue_min_interval": "Philips Hue: min. interval between commands",
+          "zwave_max_transition": "Z-Wave: max. transition",
+          "zwave_min_interval": "Z-Wave: min. interval between commands",
+          "generic_max_transition": "Generic / WLAN: max. transition",
+          "generic_min_interval": "Generic / WLAN: min. interval between commands"
         }
       }
     },
@@ -27,6 +53,26 @@
       "invalid_json": "Invalid JSON format — check the file content",
       "invalid_schedule": "Invalid schedule data — check keyframes",
       "invalid_file": "Could not read file — please try manual paste"
+    }
+  },
+  "selector": {
+    "light_type": {
+      "options": {
+        "dali": "DALI (max. 90 s)",
+        "dali2_extended": "DALI-2 Extended Fade (max. 27 min)",
+        "casambi": "Casambi / Bluetooth Mesh (max. 10 min)",
+        "zigbee": "Zigbee (max. 10 min)",
+        "hue": "Philips Hue (max. 10 min)",
+        "zwave": "Z-Wave (max. 5 min)",
+        "generic": "Generic / WLAN (max. 5 min)"
+      }
+    },
+    "resume_mode": {
+      "options": {
+        "never": "Only by off/on or the follow switch",
+        "minutes": "After a number of minutes",
+        "next_keyframe": "At the next keyframe"
+      }
     }
   }
 }

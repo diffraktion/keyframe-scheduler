@@ -1,15 +1,16 @@
 {
   "domain": "keyframe_scheduler",
   "name": "Keyframe Scheduler",
-  "version": "3.0.14",
+  "version": "4.0.0b1",
   "documentation": "https://github.com/mjmijh/keyframe-scheduler",
   "issue_tracker": "https://github.com/mjmijh/keyframe-scheduler/issues",
   "codeowners": [],
   "config_flow": true,
   "iot_class": "local_polling",
   "requirements": [],
-  "dependencies": [],
+  "dependencies": ["frontend", "http"],
   "platforms": [
-    "sensor"
+    "sensor",
+    "switch"
   ]
 }

@@ -13,7 +13,7 @@ set_schedule:
       name: Schedule JSON
       description: The schedule as a JSON string or dict
       required: true
-      example: '{"version": 1, "timezone": "Europe/Berlin", "stepMinutes": 5, "wrapAround": true, "keyframes": [...]}'
+      example: '{"version": 1, "timezone": "Europe/Berlin", "stepMinutes": 5, "keyframes": [...]}'
       selector:
         object:
 
@@ -33,5 +33,55 @@ upload_from_file:
       description: Full path to JSON file in /config/ directory
       required: true
       example: "/config/schedules/living-room.json"
+      selector:
+        text:
+
+apply:
+  name: Apply schedule now
+  description: >
+    Send the current schedule values to the lights of an instance right away
+    (only lights that are on and follow the schedule; paused lights stay paused).
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Limit to one scheduler instance (optional)
+      required: false
+      selector:
+        text:
+    entity_id:
+      name: Lights
+      description: Limit to these lights (optional)
+      required: false
+      selector:
+        entity:
+          domain: light
+          multiple: true
+
+set_manual_control:
+  name: Set manual control
+  description: >
+    Pause (manual true) or resume (manual false) following the schedule for
+    lights. A paused light keeps its current state; resuming sends the
+    current schedule values at once.
+  fields:
+    entity_id:
+      name: Lights
+      description: The lights to pause or resume
+      required: true
+      selector:
+        entity:
+          domain: light
+          multiple: true
+    manual:
+      name: Manual control
+      description: true = pause (manual control), false = follow the schedule again
+      required: false
+      default: true
+      selector:
+        boolean:
+    entry_id:
+      name: Entry ID
+      description: Limit to one scheduler instance (optional)
+      required: false
       selector:
         text:
