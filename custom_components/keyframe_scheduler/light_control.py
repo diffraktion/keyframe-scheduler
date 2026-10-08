@@ -25,8 +25,9 @@ from collections import deque
 from datetime import datetime, timedelta
 from typing import Any, Callable, Deque, Dict, List, Optional
 
-from homeassistant.core import Context, Event, HomeAssistant, callback
+from homeassistant.core import Context, CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -118,8 +119,13 @@ class KeyframeLightController:
         self._refresh_members()
         self._evaluator = getattr(self.coordinator, "evaluator", None)
         self._unsub.append(self.coordinator.async_add_listener(self._on_schedule_update))
-        # Group members can appear late during startup: refresh once HA runs
-        self._unsub.append(self.hass.bus.async_listen_once("homeassistant_started", self._on_started))
+        # Group members can appear late during startup: refresh once HA runs.
+        # async_at_started, not bus.async_listen_once: removing a once-listener
+        # that has already fired logs "Unable to remove unknown job listener"
+        # when the instance is reloaded later. On a reload HA already runs and
+        # the members are there, so nothing to wait for.
+        if self.hass.state is not CoreState.running:
+            self._unsub.append(async_at_started(self.hass, self._on_started))
         # Lights that are already on get the current values right away
         self.hass.async_create_task(self.async_apply())
 
@@ -134,7 +140,7 @@ class KeyframeLightController:
             light.cancel_timers()
 
     @callback
-    def _on_started(self, _event: Event) -> None:
+    def _on_started(self, _hass: HomeAssistant) -> None:
         self._refresh_members()
         self.hass.async_create_task(self.async_apply(force=True))
 

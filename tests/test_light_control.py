@@ -100,6 +100,40 @@ def setup(lights, states=None, clock=None, keyframes=RAMP, **options):
     return hass, coord, ctrl, switches
 
 
+class StartupTests(unittest.TestCase):
+    """Waiting for HA to have started (group members appear late)."""
+
+    def test_refresh_once_ha_has_started(self):
+        hass, _, ctrl, _ = setup({"light.a": "generic"}, {"light.a": ("on", CT)})
+        self.assertEqual(len(hass.at_started), 1)
+        before = len(turn_on_calls(hass, "light.a"))
+        hass.start()
+        hass.run()
+        self.assertEqual(len(turn_on_calls(hass, "light.a")), before + 1)   # forced apply
+
+        # stopping after the callback ran must not try to remove it again
+        # (HA logs "Unable to remove unknown job listener" for a fired once-listener)
+        hass.async_create_task(ctrl.async_stop())
+        hass.run()
+        self.assertEqual(hass.at_started, [])
+
+    def test_stop_before_ha_has_started_cancels_the_wait(self):
+        hass, _, ctrl, _ = setup({"light.a": "generic"}, {"light.a": ("on", CT)})
+        hass.async_create_task(ctrl.async_stop())
+        hass.run()
+        self.assertEqual(hass.at_started, [])
+
+    def test_reload_while_ha_runs_does_not_wait(self):
+        hass = FakeHass()
+        hass.state = "running"
+        hass.states.set("light.a", "on", CT)
+        ctrl = KeyframeLightController(hass, FakeCoordinator(evaluator()), {"light.a": "generic"})
+        ctrl._now = Clock(7, 10)
+        hass.async_create_task(ctrl.async_start())
+        hass.run()
+        self.assertEqual(hass.at_started, [])
+
+
 def turn_on_calls(hass, entity_id=None):
     return [c[2] for c in hass.services.calls
             if c[:2] == ("light", "turn_on") and entity_id in (None, c[2]["entity_id"])]

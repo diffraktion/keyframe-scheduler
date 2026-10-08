@@ -51,6 +51,18 @@ class DataUpdateCoordinator:
         return lambda: self._listeners.remove(fn)
 
 
+class CoreState:
+    starting = "starting"
+    running = "running"
+
+
+def _async_at_started(hass, at_start_cb):
+    """Like HA: run when HA has started; the returned cancel is safe after it ran."""
+    entry = [at_start_cb]
+    hass.at_started.append(entry)
+    return lambda: hass.at_started.remove(entry) if entry in hass.at_started else None
+
+
 def _install():
     if "homeassistant" in sys.modules and getattr(sys.modules["homeassistant"], "_is_stub", False):
         return
@@ -72,7 +84,8 @@ def _install():
     module("homeassistant.config_entries", ConfigEntry=object)
     module("homeassistant.const", Platform=Platform)
     module("homeassistant.core", HomeAssistant=object, ServiceCall=object, callback=lambda f: f,
-           Context=Context, Event=Event)
+           Context=Context, Event=Event, CoreState=CoreState)
+    module("homeassistant.helpers.start", async_at_started=_async_at_started)
     module("homeassistant.helpers")
     module("homeassistant.helpers.event",
            async_track_point_in_time=None,
@@ -122,6 +135,8 @@ class FakeHass:
         self.services = _Services()
         self.bus = _Bus()
         self.timers = []       # (delay, action)
+        self.state = CoreState.starting
+        self.at_started = []   # [callback] waiting for HA to have started
         self.tracked = []      # (entity_ids, action)
         self._tasks = []
 
@@ -136,6 +151,13 @@ class FakeHass:
     def track(self, entity_ids, action):
         self.tracked.append((list(entity_ids), action))
         return lambda: None
+
+    def start(self):
+        """HA has started: run the async_at_started callbacks once."""
+        self.state = CoreState.running
+        waiting, self.at_started = self.at_started, []
+        for (callback_,) in waiting:
+            callback_(self)
 
     def run(self):
         """Run all pending tasks (repeatedly, tasks may create tasks)."""

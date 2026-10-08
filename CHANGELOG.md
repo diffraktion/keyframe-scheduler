@@ -23,6 +23,9 @@
 - Light type "DALI-2 Extended Fade": longest fade 900 s instead of 1620 s — DALI-2 extended fade time ends at 16 min, and no DALI fade may exceed 15 min
 - Sidebar panel: `frontend` and `http` declared as dependencies; a failed panel registration is logged
 
+#### Fixed
+- Reloading an instance no longer logs "Unable to remove unknown job listener … homeassistant_started": the controller waits for the start of Home Assistant with `async_at_started` (safe to cancel after it ran) and does not wait at all when Home Assistant already runs
+
 ### [4.0.0-beta.1] - 2026-09-30 — not tested yet
 
 > Beta: not yet tested in a live Home Assistant installation. The light type timing defaults in particular still need to be validated.
