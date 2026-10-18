@@ -157,6 +157,31 @@
     .keyframes-table .valid-editor input.valid-day { width: 56px; }
     .valid-help { flex-basis: 100%; font-size: var(--lkl-fs-sm); color: var(--lkl-text-3); }
 
+    /* `hidden` must win over component display rules (e.g. .btn-row is flex) */
+    [hidden] { display: none !important; }
+
+    /* ---- Pages: schedule | scenes ------------------------------------------- */
+    .page-tabs { display: flex; gap: var(--lkl-space-2); margin: 0 0 var(--lkl-space-4); }
+
+    /* ---- Scenes: targets (rows) x scenes (columns) -------------------------- */
+    .scenes-table td, .scenes-table th { vertical-align: top; }
+    .scenes-table th { min-width: 150px; }
+    .scenes-table th:first-child, .scenes-table td:first-child { min-width: 180px; }
+    .scenes-table .name-row { display: flex; gap: var(--lkl-space-1); align-items: center; }
+    .scenes-table input.name { width: 100%; min-width: 110px; font-weight: 600; }
+    .scenes-table .lkl-input, .scenes-table .lkl-select {
+      padding: var(--lkl-space-1) var(--lkl-space-2);
+      font-size: var(--lkl-fs-md);
+    }
+    .scene-cell { display: flex; flex-direction: column; gap: var(--lkl-space-1); }
+    .scene-cell .values { display: flex; gap: var(--lkl-space-1); align-items: center; }
+    .scene-cell input[type="number"] { width: 72px; }
+    .scene-cell .unit { font-size: var(--lkl-fs-xs); color: var(--lkl-text-3); }
+    .scene-cell.is-keep .lkl-select { color: var(--lkl-text-3); }
+    .scenes-help { font-size: var(--lkl-fs-sm); color: var(--lkl-text-3); margin-top: var(--lkl-space-3); }
+    .keyframes-table .scene-select { min-width: 180px; }
+    .view-target { width: auto; min-width: 140px; }
+
     /* Narrower than the table (~1280 px content): every keyframe becomes a
        card — the fields wrap, each with its column name above, unused ones
        (transition fields of an instant keyframe) are hidden. No sideways
@@ -439,6 +464,12 @@
       </div>
     </header>
 
+    <!-- Pages: the schedule, and the scenes it refers to (state.mode 'scenes') -->
+    <nav class="page-tabs" aria-label="Seiten">
+      <button class="lkl-chip is-active" data-page-tab="schedule" id="tabSchedule">Zeitplan</button>
+      <button class="lkl-chip" data-page-tab="scenes" id="tabScenes">Szenen</button>
+    </nav>
+
     <script>
     function switchLanguage(lang) {
       const filename = lang === 'en' ? 'webapp_en.html' : 'webapp.html';
@@ -456,7 +487,7 @@
     </script>
 
     <!-- Settings Card -->
-    <section class="lkl-card">
+    <section class="lkl-card" data-page="schedule">
       <div class="card-head">
         <h2 class="lkl-h2" id="card-title-settings">Einstellungen</h2>
       </div>
@@ -517,7 +548,7 @@
     </section>
 
     <!-- Keyframes Card -->
-    <section class="lkl-card">
+    <section class="lkl-card" data-page="schedule">
       <div class="card-head">
         <h2 class="lkl-h2" id="card-title-keyframes">Keyframes</h2>
       </div>
@@ -550,12 +581,13 @@
     </section>
 
     <!-- Year Card -->
-    <section class="lkl-card">
+    <section class="lkl-card" data-page="schedule">
       <div class="view-toolbar">
         <div class="card-head">
           <h2 class="lkl-h2" id="card-title-year">Jahresübersicht</h2>
         </div>
         <div class="toolbar-group">
+          <select class="lkl-select view-target" data-view-target aria-label="Target" hidden></select>
           <div class="control-group">
             <span class="control-group-label" id="yearGroupArtificial">Kunstlicht</span>
             <button class="lkl-chip is-compact is-active" data-year-mode="dim" id="yearModeDim">Helligkeit</button>
@@ -593,12 +625,13 @@
     </section>
 
     <!-- Day Card -->
-    <section class="lkl-card" id="dayCard">
+    <section class="lkl-card" id="dayCard" data-page="schedule">
       <div class="view-toolbar">
         <div class="card-head">
           <h2 class="lkl-h2" id="card-title-preview">Tagesansicht</h2>
         </div>
         <div class="toolbar-group">
+          <select class="lkl-select view-target" data-view-target aria-label="Target" hidden></select>
           <button class="lkl-btn is-small" id="dayPrevBtn" aria-label="Previous day">‹</button>
           <input class="lkl-input" type="date" id="viewDate">
           <button class="lkl-btn is-small" id="dayNextBtn" aria-label="Next day">›</button>
@@ -617,8 +650,16 @@
       </div>
     </section>
 
+    <!-- Scenes Card (page "scenes"): targets x scenes, rendered by renderScenes() -->
+    <section class="lkl-card" data-page="scenes" id="scenesCard" hidden>
+      <div class="card-head">
+        <h2 class="lkl-h2" id="card-title-scenes">Szenen</h2>
+      </div>
+      <div id="scenesContainer"></div>
+    </section>
+
     <!-- Export/Import Card -->
-    <section class="lkl-card">
+    <section class="lkl-card" data-page="schedule scenes">
       <div class="card-head">
         <h2 class="lkl-h2" id="card-title-export">Export & Import</h2>
       </div>
@@ -804,6 +845,9 @@
       location: null,   // { lat, lon, tz } — null until set, see getLocation()
       groupRules: {},     // { A: "earliest" | "latest" | "all" }, see listGroups()
       picoBus: 'dali',     // PICO export: 'dali' (fades split at 15 min) or 'free'
+      mode: 'values',      // 'values' (brightness + kelvin per keyframe) or 'scenes', see SCENES
+      targets: [],         // scenes mode: [{ id, name }]
+      scenes: [],          // scenes mode: [{ id, name, values: { [targetId]: { on, dim, kelvin } } }]
       keyframes: []
     };
 
@@ -861,6 +905,7 @@
         notBefore: kf.notBefore || '',
         notAfter: kf.notAfter || '',
         group: GROUP_IDS.includes(kf.group) ? kf.group : '',
+        scene: typeof kf.scene === 'string' ? kf.scene : '',   // scenes mode: the scene it calls
         ...normalizeValidOn(kf.validOn || kf)
       };
     }
@@ -958,6 +1003,7 @@
     function invalidateResolved() {
       resolvedCache = new Map();
       timelineCache = new Map();
+      targetTimelineCache = new Map();
       yearGrid = null;
       conflictCache = null;
       hintCache = null;
@@ -1416,6 +1462,33 @@ const translations = {
     ha_save_confirm: "Zeitplan in „{title}“ speichern? Er ersetzt den bisherigen Zeitplan dieser Instanz, die Leuchten folgen ihm sofort.",
     ha_save_done: "Gespeichert – „{title}“ folgt jetzt diesem Zeitplan.",
     ha_save_failed: "Speichern in „{title}“ fehlgeschlagen: {reason}",
+    tab_schedule: "Zeitplan",
+    tab_scenes: "Szenen",
+    scenes_title: "Szenen",
+    th_scene: "Szene",
+    th_target: "Target",
+    scene_choose: "– Szene wählen –",
+    scene_new: "Szene",
+    target_new: "Target",
+    scene_add: "+ Szene",
+    target_add: "+ Target",
+    scene_delete: "Szene löschen",
+    target_delete: "Target löschen",
+    scene_unused: "von keinem Keyframe genutzt",
+    scene_delete_confirm: "„{scene}“ wird von {n} Keyframe(s) genutzt. Trotzdem löschen? Diese Keyframes haben dann keine Szene mehr.",
+    target_delete_confirm: "Target „{target}“ aus allen Szenen löschen?",
+    scene_value_keep: "– unverändert",
+    scene_value_on: "an",
+    scene_value_off: "aus",
+    scenes_values_info: "Dieser Zeitplan nutzt Einzelwerte: Jeder Keyframe hat Helligkeit und Farbtemperatur, alle Leuchten folgen derselben Kurve. Mit Szenen bekommt jeder Keyframe stattdessen eine Szene – mit eigenen Werten für jedes Target, die Szenen können Targets auch ein- und ausschalten.",
+    scenes_convert_btn: "Auf Szenen umstellen",
+    scenes_back_btn: "Zurück zu Einzelwerten",
+    scenes_back_confirm: "Zurück zu Einzelwerten: die Keyframes übernehmen die Werte von „{target}“, die übrigen Targets entfallen in der Kurve. Fortfahren?",
+    scenes_target_help: "Ein Target ist ein einzeln steuerbarer Lichtanteil: eine Leuchte, eine Gruppe oder z. B. der Direkt- oder Indirektanteil einer Leuchte.",
+    scenes_value_help: "„aus“ schaltet das Target zur Zeit des Keyframes aus, „an“ mit Werten schaltet es ein bzw. stellt sie ein; „unverändert“ lässt es, wie es ist. Übergänge zwischen Szenen laufen je Target nach dem Modus des Keyframes.",
+    scene_target_all: "Alle",
+    pico_scenes_pending: "Szenen werden in den PICO-Export erst in einem späteren Schritt übernommen (ein PICO-Target je Szenen-Target).",
+    ha_scenes_pending: "Szenen-Zeitpläne kann die Integration erst nach dem nächsten Update ausführen – Speichern in eine Instanz ist bis dahin gesperrt.",
     load_file: "Datei laden",
     save_file: "Als Datei speichern",
     pdf_export: "PDF Export",
@@ -1698,6 +1771,33 @@ const translations = {
     ha_save_confirm: "Save the schedule into \"{title}\"? It replaces this instance's schedule and the lights follow it at once.",
     ha_save_done: "Saved – \"{title}\" now follows this schedule.",
     ha_save_failed: "Saving into \"{title}\" failed: {reason}",
+    tab_schedule: "Schedule",
+    tab_scenes: "Scenes",
+    scenes_title: "Scenes",
+    th_scene: "Scene",
+    th_target: "Target",
+    scene_choose: "– choose a scene –",
+    scene_new: "Scene",
+    target_new: "Target",
+    scene_add: "+ Scene",
+    target_add: "+ Target",
+    scene_delete: "Delete scene",
+    target_delete: "Delete target",
+    scene_unused: "used by no keyframe",
+    scene_delete_confirm: "\"{scene}\" is used by {n} keyframe(s). Delete anyway? Those keyframes then have no scene.",
+    target_delete_confirm: "Delete target \"{target}\" from all scenes?",
+    scene_value_keep: "– unchanged",
+    scene_value_on: "on",
+    scene_value_off: "off",
+    scenes_values_info: "This schedule uses single values: every keyframe has brightness and colour temperature, all lights follow the same curve. With scenes every keyframe gets a scene instead – with its own values for each target; scenes can also switch targets on and off.",
+    scenes_convert_btn: "Switch to scenes",
+    scenes_back_btn: "Back to single values",
+    scenes_back_confirm: "Back to single values: the keyframes take the values of \"{target}\", the other targets drop out of the curve. Continue?",
+    scenes_target_help: "A target is a separately controlled share of light: a light, a group, or e.g. the direct or indirect part of a luminaire.",
+    scenes_value_help: "\"off\" switches the target off at the keyframe, \"on\" with values switches it on or sets them; \"unchanged\" leaves it as it is. Transitions between scenes run per target with the keyframe's mode.",
+    scene_target_all: "All",
+    pico_scenes_pending: "Scenes are taken into the PICO export in a later step (one PICO target per scene target).",
+    ha_scenes_pending: "The integration runs scene schedules only after the next update – saving into an instance is blocked until then.",
     load_file: "Load File",
     save_file: "Save as File",
     pdf_export: "PDF Export",
@@ -1980,6 +2080,33 @@ const translations = {
     ha_save_confirm: "¿Guardar el horario en «{title}»? Sustituye el horario de esta instancia y las luces lo siguen de inmediato.",
     ha_save_done: "Guardado: «{title}» sigue ahora este horario.",
     ha_save_failed: "Error al guardar en «{title}»: {reason}",
+    tab_schedule: "Horario",
+    tab_scenes: "Escenas",
+    scenes_title: "Escenas",
+    th_scene: "Escena",
+    th_target: "Target",
+    scene_choose: "– elegir escena –",
+    scene_new: "Escena",
+    target_new: "Target",
+    scene_add: "+ Escena",
+    target_add: "+ Target",
+    scene_delete: "Borrar escena",
+    target_delete: "Borrar target",
+    scene_unused: "sin uso en keyframes",
+    scene_delete_confirm: "«{scene}» la usan {n} keyframe(s). ¿Borrar igualmente? Esos keyframes se quedan sin escena.",
+    target_delete_confirm: "¿Borrar el target «{target}» de todas las escenas?",
+    scene_value_keep: "– sin cambio",
+    scene_value_on: "encendido",
+    scene_value_off: "apagado",
+    scenes_values_info: "Este horario usa valores individuales: cada keyframe tiene brillo y temperatura de color, todas las luces siguen la misma curva. Con escenas cada keyframe recibe una escena, con valores propios para cada target; las escenas también pueden encender y apagar targets.",
+    scenes_convert_btn: "Cambiar a escenas",
+    scenes_back_btn: "Volver a valores individuales",
+    scenes_back_confirm: "Volver a valores individuales: los keyframes toman los valores de «{target}», los demás targets salen de la curva. ¿Continuar?",
+    scenes_target_help: "Un target es una parte de luz controlada por separado: una luz, un grupo o p. ej. la parte directa o indirecta de una luminaria.",
+    scenes_value_help: "«apagado» apaga el target a la hora del keyframe, «encendido» con valores lo enciende o los ajusta; «sin cambio» lo deja como está. Las transiciones entre escenas siguen, por target, el modo del keyframe.",
+    scene_target_all: "Todas",
+    pico_scenes_pending: "Las escenas pasarán a la exportación PICO en un paso posterior (un target PICO por target de escena).",
+    ha_scenes_pending: "La integración ejecuta horarios con escenas solo tras la próxima actualización; hasta entonces no se puede guardar en una instancia.",
     load_file: "Cargar Archivo",
     save_file: "Guardar como Archivo",
     pdf_export: "Exportar PDF",
@@ -2266,6 +2393,9 @@ const translations = {
       setText('locFromHaBtn', 'loc_from_ha');
       setText('locFromBrowserBtn', 'loc_from_browser');
       setText('card-title-year', 'year_title');
+      setText('tabSchedule', 'tab_schedule');
+      setText('tabScenes', 'tab_scenes');
+      setText('card-title-scenes', 'scenes_title');
       setText('yearModeDaylight', 'year_mode_daylight');
       setText('yearGroupArtificial', 'year_group_artificial');
       setText('yearModeDim', 'year_mode_dim');
@@ -2356,6 +2486,8 @@ const translations = {
       updateWorkflowBox();
       
       // Re-render everything with new language
+      renderScenes();
+      renderTargetSelectors();
       renderKeyframes();
       renderViews();
       updateJsonOutput();
@@ -2374,6 +2506,7 @@ const translations = {
           state.keyframes = (state.keyframes || []).map(normalizeKeyframe);
           ensureUniqueIds();
           pruneGroups();
+          normalizeScenes();
         } else {
           // Load example preset on first visit
           state.keyframes = PRESETS.time.map(normalizeKeyframe);
@@ -2402,6 +2535,9 @@ const translations = {
       document.getElementById('horizonHours').value = state.horizonHours;
       document.getElementById('scheduleName').value = state.scheduleName || 'My Schedule';
       updateLocationFields();
+      renderPages();
+      renderScenes();
+      renderTargetSelectors();
       renderKeyframes();
       renderViews();
       updateJsonOutput();
@@ -2524,6 +2660,7 @@ const translations = {
       const entryId = document.getElementById('haSaveTarget').value;
       const entry = haSchedules.find(s => s.entry_id === entryId);
       if (!hass || !entry) return;
+      if (isScenesMode()) { alert(t('ha_scenes_pending')); return; }
       if (!confirm(t('ha_save_confirm').replace('{title}', entry.title))) return;
       try {
         await hass.callWS({ type: 'keyframe_scheduler/save_schedule', entry_id: entryId, schedule: generateHaJson() });
@@ -2601,7 +2738,8 @@ const translations = {
         mode: 'instant',
         transitionSeconds: 300,
         transitionDirection: 'after',
-        curve: 'linear'
+        curve: 'linear',
+        scene: isScenesMode() ? (state.scenes[0]?.id || '') : ''
       }));
 
       saveState();
@@ -2697,6 +2835,8 @@ const translations = {
         state.keyframes = PRESETS[presetName].map(normalizeKeyframe);
         state.scheduleName = t('preset_' + presetName);   // file name and PDF title follow the example
         state.groupRules = {};   // groups belong to the replaced keyframes
+        // The examples use single values; their scenes would be stale
+        Object.assign(state, { mode: 'values', targets: [], scenes: [] });
         saveState();
         updateUI();
       }
@@ -2937,8 +3077,10 @@ const translations = {
               <th style="width: 60px;">${t('th_group')}</th>
               <th>${t('th_time')}</th>
               <th>${t('th_valid')}</th>
-              <th>${t('th_brightness')}</th>
-              <th>${t('th_kelvin')}</th>
+              ${isScenesMode()
+                ? `<th colspan="2">${t('th_scene')}</th>`
+                : `<th>${t('th_brightness')}</th>
+              <th>${t('th_kelvin')}</th>`}
               <th>${t('th_mode')}</th>
               <th>${t('th_transition')}</th>
               <th>${t('th_direction')}</th>
@@ -2969,6 +3111,13 @@ const translations = {
                       aria-expanded="${validOpen.has(kf.id)}" title="${t('valid_title')}"
                       onclick="toggleValidEditor('${kf.id}')">${validSummary(kf) || t('valid_daily')}</button>
             </td>
+            ${isScenesMode() ? `
+            <td colspan="2" data-label="${t('th_scene')}">
+              <select class="lkl-select scene-select" onchange="updateKeyframe(${index}, 'scene', this.value)">
+                ${sceneById(kf.scene) ? '' : `<option value="" selected>${t('scene_choose')}</option>`}
+                ${state.scenes.map(sc => `<option value="${sc.id}" ${kf.scene === sc.id ? 'selected' : ''}>${escapeHtml(sc.name)}</option>`).join('')}
+              </select>
+            </td>` : `
             <td data-label="${t('th_brightness')}">
               <input class="lkl-input" type="number" min="0" max="100" step="5"
                      value="${kf.dim}"
@@ -2978,7 +3127,7 @@ const translations = {
               <input class="lkl-input" type="number" min="2000" max="6500" step="100"
                      value="${kf.kelvin}"
                      oninput="updateKeyframe(${index}, 'kelvin', this.value)">
-            </td>
+            </td>`}
             <td data-label="${t('th_mode')}">
               <select class="lkl-select" onchange="updateKeyframe(${index}, 'mode', this.value)">
                 <option value="instant" ${kf.mode === 'instant' ? 'selected' : ''}>${t('mode_instant')}</option>
@@ -3201,7 +3350,137 @@ const translations = {
       return list;
     }
 
+    // ============================================================================
+    // SCENES
+    // ============================================================================
+    //
+    // A schedule runs in one of two modes (state.mode), never mixed:
+    //   'values' — every keyframe carries brightness + colour temperature; all
+    //              lights follow the same curve
+    //   'scenes' — every keyframe calls a scene. A scene holds the values of
+    //              each TARGET, the smallest independently controlled unit: a
+    //              light, a group, or e.g. the direct / indirect part of a
+    //              luminaire (like a PICO target). Every target follows its own
+    //              curve, built from the scenes with the usual keyframe modes
+    //              (instant / transition / interpolate). A scene can switch a
+    //              target off (or on again) at its keyframe; a target a scene
+    //              leaves out keeps its value.
+    //   state.targets: [{ id, name }]
+    //   state.scenes:  [{ id, name, values: { [targetId]: { on: true, dim, kelvin } | { on: false } } }]
+    //   keyframe.scene: the scene id
+
+    const isScenesMode = () => state.mode === 'scenes';
+    const newSceneId = prefix => prefix + Math.random().toString(36).slice(2, 8);
+    const sceneById = id => (state.scenes || []).find(sc => sc.id === id) || null;
+
+    /** Clean targets / scenes from storage or a file. */
+    function normalizeScenes() {
+      state.mode = state.mode === 'scenes' ? 'scenes' : 'values';
+      const seen = new Set();
+      state.targets = (Array.isArray(state.targets) ? state.targets : [])
+        .filter(tg => tg && typeof tg.id === 'string' && !seen.has(tg.id) && seen.add(tg.id))
+        .map(tg => ({ id: tg.id, name: String(tg.name || tg.id) }));
+      const ids = new Set(state.targets.map(tg => tg.id));
+      state.scenes = (Array.isArray(state.scenes) ? state.scenes : [])
+        .filter(sc => sc && typeof sc.id === 'string')
+        .map(sc => {
+          const values = {};
+          Object.entries(sc.values || {}).forEach(([tid, v]) => {
+            if (!ids.has(tid) || !v) return;
+            values[tid] = v.on === false
+              ? { on: false }
+              : { on: true, dim: clamp(Number(v.dim) || 0, 0, 100), kelvin: clamp(Number(v.kelvin) || 4000, 1000, 10000) };
+          });
+          return { id: sc.id, name: String(sc.name || sc.id), values };
+        });
+    }
+
+    // Target shown in the day and year views (scenes mode)
+    let viewTarget = null;
+    function currentTarget() {
+      if (!isScenesMode() || !state.targets.length) return null;
+      return state.targets.some(tg => tg.id === viewTarget) ? viewTarget : state.targets[0].id;
+    }
+
+    /**
+     * A timeline as one target sees it: each keyframe with the values its
+     * scene gives this target. Keyframes whose scene leaves the target out
+     * are dropped — the target keeps its value until a scene sets it. "Off"
+     * is brightness 0 at the colour temperature the target had before, so a
+     * fade-out does not shift colour.
+     */
+    function targetTimeline(list, targetId) {
+      const mapped = [];
+      list.forEach(kf => {
+        const v = sceneById(kf.scene)?.values?.[targetId];
+        if (!v) return;
+        mapped.push(v.on === false
+          ? { ...kf, dim: 0, kelvin: null, off: true }
+          : { ...kf, dim: v.dim, kelvin: v.kelvin, off: false });
+      });
+      const sorted = [...mapped].sort((a, b) => kfMinutes(a) - kfMinutes(b));
+      let last = [...sorted].reverse().find(k => k.kelvin != null)?.kelvin ?? 2700;
+      sorted.forEach(k => { if (k.kelvin == null) k.kelvin = last; else last = k.kelvin; });
+      return mapped;
+    }
+
+    /** The timeline the simulation evaluates on dateStr: all keyframes in
+        values mode, the current target's view in scenes mode. */
+    let targetTimelineCache = new Map();
+    function simTimeline(dateStr) {
+      const base = resolveTimeline(dateStr);
+      if (!isScenesMode()) return base;
+      const target = currentTarget();
+      if (!target) return [];
+      const key = dateStr + '|' + target;
+      let list = targetTimelineCache.get(key);
+      if (!list) targetTimelineCache.set(key, list = targetTimeline(base, target));
+      return list;
+    }
+
+    /** Values -> scenes: one target "All", one scene per distinct keyframe value. */
+    function convertToScenes() {
+      const target = { id: newSceneId('t'), name: t('scene_target_all') };
+      const byValue = new Map();
+      state.keyframes.forEach(kf => {
+        const key = `${kf.dim}|${kf.kelvin}`;
+        if (!byValue.has(key)) {
+          byValue.set(key, {
+            id: newSceneId('s'),
+            name: `${t('scene_new')} ${byValue.size + 1}`,
+            values: { [target.id]: { on: true, dim: kf.dim, kelvin: kf.kelvin } }
+          });
+        }
+        kf.scene = byValue.get(key).id;
+      });
+      state.targets = [target];
+      state.scenes = byValue.size ? [...byValue.values()]
+        : [{ id: newSceneId('s'), name: `${t('scene_new')} 1`, values: { [target.id]: { on: true, dim: 80, kelvin: 4000 } } }];
+      state.mode = 'scenes';
+      viewTarget = target.id;
+      saveState();
+      updateUI();
+    }
+
+    /** Scenes -> values: the first target's values (asks first if there are more). */
+    function convertToValues() {
+      if (state.targets.length > 1 && !confirm(t('scenes_back_confirm').replace('{target}', state.targets[0].name))) return;
+      const first = state.targets[0]?.id;
+      state.keyframes.forEach(kf => {
+        const v = sceneById(kf.scene)?.values?.[first];
+        if (v) {
+          kf.dim = v.on === false ? 0 : v.dim;
+          if (v.on !== false) kf.kelvin = v.kelvin;
+        }
+      });
+      state.mode = 'values';
+      saveState();
+      updateUI();
+    }
+
     function evaluateSchedule(timeMinutes, keyframes = state.keyframes) {
+      // A target no scene gives a value: dark (scenes mode)
+      if (keyframes.length === 0 && isScenesMode()) return { kelvin: 2700, dim: 0, transition: 0 };
       if (keyframes.length === 0) {
         return { kelvin: 4000, dim: 50, transition: 300 };
       }
@@ -3518,7 +3797,7 @@ const translations = {
 
     /** Simulated output at wall-clock minutes of a given local day. */
     function simulateAt(dateStr, minutes) {
-      return evaluateSchedule(minutes, resolveTimeline(dateStr));
+      return evaluateSchedule(minutes, simTimeline(dateStr));
     }
 
     /** Chart.js plugin: shades night and twilight behind the curves, from the
@@ -3548,6 +3827,7 @@ const translations = {
             lastX[row] = m.px;
             // Labels live in the chart's top padding, row 0 closest to the plot
             const labelTop = area.top - (row + 1) * rowHeight - 2;
+            ctx.globalAlpha = m.muted ? 0.3 : 1;
             ctx.strokeStyle = m.overlap ? opts.overlapColor : opts.lineColor;
             ctx.lineWidth = m.overlap ? 1.5 : 1;
             ctx.setLineDash(m.overlap ? [4, 3] : [2, 3]);
@@ -3641,11 +3921,14 @@ const translations = {
         const date = addDays(viewDate, day);
         const overlapping = new Set();
         overlapsOn(date).forEach(o => { overlapping.add(o.pair.early); overlapping.add(o.pair.late); });
+        const target = currentTarget();
         resolveKeyframes(date).forEach(k => {
           keyframeMarks.push({
             index: (day * 1440 + parseTime(k.time)) / chartStepMinutes,
             label: `#${k.sourceIndex + 1}`,
-            overlap: overlapping.has(k.sourceIndex)
+            overlap: overlapping.has(k.sourceIndex),
+            // scenes mode: the keyframe's scene leaves the viewed target alone
+            muted: !!target && !sceneById(k.scene)?.values?.[target]
           });
         });
       }
@@ -4126,7 +4409,7 @@ const translations = {
         const date = addDays(`${year}-01-01`, d);
         const keyframes = resolveKeyframes(date);
         keyframes.forEach(kf => { kfTimes[kf.sourceIndex][d] = parseTime(kf.time); });
-        const timeline = resolveTimeline(date);
+        const timeline = simTimeline(date);
         // Local midnight once per day; the rows add minutes to it (the one-hour
         // shift inside a DST day is irrelevant at this resolution).
         const midnight = loc ? KfAstro.localMidnightUtc(parseDate(date).y, parseDate(date).m, parseDate(date).d, loc.tz) : 0;
@@ -4525,6 +4808,188 @@ const translations = {
       };
     }
 
+    // ---- Scenes page ----------------------------------------------------------
+
+    let currentPage = 'schedule';
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function showPage(page) {
+      currentPage = page === 'scenes' ? 'scenes' : 'schedule';
+      renderPages();
+      // Charts drawn while hidden have no size: draw again when visible
+      if (currentPage === 'schedule') renderViews();
+    }
+
+    function renderPages() {
+      document.querySelectorAll('[data-page]').forEach(el => {
+        el.hidden = !el.dataset.page.split(' ').includes(currentPage);
+      });
+      document.querySelectorAll('[data-page-tab]').forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.pageTab === currentPage);
+      });
+    }
+
+    /** Target pickers of the day and year view (scenes mode only). */
+    function renderTargetSelectors() {
+      const target = currentTarget();
+      document.querySelectorAll('[data-view-target]').forEach(select => {
+        select.hidden = !isScenesMode();
+        if (!isScenesMode()) return;
+        select.innerHTML = state.targets
+          .map(tg => `<option value="${tg.id}" ${tg.id === target ? 'selected' : ''}>${escapeHtml(tg.name)}</option>`).join('');
+        select.setAttribute('aria-label', t('th_target'));
+      });
+    }
+
+    function setViewTarget(id) {
+      viewTarget = id;
+      yearGrid = null;
+      renderTargetSelectors();
+      renderViews();
+    }
+
+    function renderScenes() {
+      const el = document.getElementById('scenesContainer');
+      if (!isScenesMode()) {
+        el.innerHTML = `
+          <p class="lkl-body-sm">${t('scenes_values_info')}</p>
+          <div class="btn-row spaced"><button class="lkl-btn is-primary" onclick="convertToScenes()">${t('scenes_convert_btn')}</button></div>
+          <p class="scenes-help">${t('scenes_target_help')}</p>`;
+        return;
+      }
+      const used = new Set(state.keyframes.map(kf => kf.scene));
+      const cell = (sc, tg) => {
+        const v = sc.values[tg.id];
+        const kind = !v ? 'keep' : v.on === false ? 'off' : 'on';
+        return `
+          <td>
+            <div class="scene-cell is-${kind}">
+              <select class="lkl-select" onchange="setSceneValue('${sc.id}', '${tg.id}', 'kind', this.value)">
+                <option value="keep" ${kind === 'keep' ? 'selected' : ''}>${t('scene_value_keep')}</option>
+                <option value="on" ${kind === 'on' ? 'selected' : ''}>${t('scene_value_on')}</option>
+                <option value="off" ${kind === 'off' ? 'selected' : ''}>${t('scene_value_off')}</option>
+              </select>
+              ${kind === 'on' ? `
+              <span class="values">
+                <input class="lkl-input" type="number" min="0" max="100" step="5" value="${v.dim}"
+                       aria-label="${t('th_brightness')}" onchange="setSceneValue('${sc.id}', '${tg.id}', 'dim', this.value)">
+                <span class="unit">%</span>
+              </span>
+              <span class="values">
+                <input class="lkl-input" type="number" min="1000" max="10000" step="100" value="${v.kelvin}"
+                       aria-label="${t('th_kelvin')}" onchange="setSceneValue('${sc.id}', '${tg.id}', 'kelvin', this.value)">
+                <span class="unit">K</span>
+              </span>` : ''}
+            </div>
+          </td>`;
+      };
+      el.innerHTML = `
+        <div class="lkl-table-wrap">
+          <table class="lkl-table scenes-table">
+            <thead>
+              <tr>
+                <th>${t('th_target')}</th>
+                ${state.scenes.map(sc => `
+                <th>
+                  <span class="name-row">
+                    <input class="lkl-input name" type="text" value="${escapeHtml(sc.name)}" aria-label="${t('th_scene')}"
+                           onchange="renameScene('${sc.id}', this.value)">
+                    <button class="lkl-btn is-quiet is-small is-danger" title="${t('scene_delete')}" aria-label="${t('scene_delete')}"
+                            onclick="deleteScene('${sc.id}')">✕</button>
+                  </span>
+                  ${used.has(sc.id) ? '' : `<span class="unit">${t('scene_unused')}</span>`}
+                </th>`).join('')}
+                <th><button class="lkl-btn is-small" onclick="addScene()">${t('scene_add')}</button></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${state.targets.map(tg => `
+              <tr>
+                <td>
+                  <span class="name-row">
+                    <input class="lkl-input name" type="text" value="${escapeHtml(tg.name)}" aria-label="${t('th_target')}"
+                           onchange="renameTarget('${tg.id}', this.value)">
+                    <button class="lkl-btn is-quiet is-small is-danger" title="${t('target_delete')}" aria-label="${t('target_delete')}"
+                            onclick="deleteTarget('${tg.id}')">✕</button>
+                  </span>
+                </td>
+                ${state.scenes.map(sc => cell(sc, tg)).join('')}
+                <td></td>
+              </tr>`).join('')}
+              <tr><td><button class="lkl-btn is-small" onclick="addTarget()">${t('target_add')}</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="scenes-help">${t('scenes_target_help')} ${t('scenes_value_help')}</p>
+        <div class="btn-row spaced"><button class="lkl-btn is-small is-quiet" onclick="convertToValues()">${t('scenes_back_btn')}</button></div>`;
+    }
+
+    function sceneChanged() {
+      saveState();
+      updateUI();
+    }
+
+    function addScene() {
+      const values = {};
+      state.targets.forEach(tg => { values[tg.id] = { on: true, dim: 80, kelvin: 4000 }; });
+      state.scenes.push({ id: newSceneId('s'), name: `${t('scene_new')} ${state.scenes.length + 1}`, values });
+      sceneChanged();
+    }
+
+    function addTarget() {
+      const target = { id: newSceneId('t'), name: `${t('target_new')} ${state.targets.length + 1}` };
+      state.targets.push(target);
+      // A new target is left out of every scene until it gets values
+      sceneChanged();
+    }
+
+    function renameScene(id, name) {
+      const sc = sceneById(id);
+      if (sc && name.trim()) { sc.name = name.trim(); sceneChanged(); }
+    }
+
+    function renameTarget(id, name) {
+      const tg = state.targets.find(x => x.id === id);
+      if (tg && name.trim()) { tg.name = name.trim(); sceneChanged(); }
+    }
+
+    function deleteScene(id) {
+      const sc = sceneById(id);
+      if (!sc) return;
+      const users = state.keyframes.filter(kf => kf.scene === id).length;
+      if (users && !confirm(t('scene_delete_confirm').replace('{scene}', sc.name).replace('{n}', users))) return;
+      state.scenes = state.scenes.filter(x => x.id !== id);
+      state.keyframes.forEach(kf => { if (kf.scene === id) kf.scene = ''; });
+      sceneChanged();
+    }
+
+    function deleteTarget(id) {
+      const tg = state.targets.find(x => x.id === id);
+      if (!tg || state.targets.length < 2) return;   // at least one target
+      if (!confirm(t('target_delete_confirm').replace('{target}', tg.name))) return;
+      state.targets = state.targets.filter(x => x.id !== id);
+      state.scenes.forEach(sc => { delete sc.values[id]; });
+      sceneChanged();
+    }
+
+    /** field 'kind' = keep | on | off, or 'dim' / 'kelvin'. */
+    function setSceneValue(sceneId, targetId, field, value) {
+      const sc = sceneById(sceneId);
+      if (!sc) return;
+      const v = sc.values[targetId];
+      if (field === 'kind') {
+        if (value === 'keep') delete sc.values[targetId];
+        else if (value === 'off') sc.values[targetId] = { on: false };
+        else sc.values[targetId] = { on: true, dim: v?.dim ?? 80, kelvin: v?.kelvin ?? 4000 };
+      } else if (v && v.on !== false) {
+        v[field] = field === 'dim' ? clamp(parseInt(value, 10) || 0, 0, 100) : clamp(parseInt(value, 10) || 4000, 1000, 10000);
+      }
+      sceneChanged();
+    }
+
     function showYearTooltip(ev) {
       const tip = document.getElementById('yearTooltip');
       const hit = yearHit(ev);
@@ -4625,6 +5090,12 @@ const translations = {
             });
           }
           if (kf.group) out.group = kf.group;
+          if (isScenesMode()) {
+            out.scene = kf.scene;
+            // For readers that know no scenes: the first target's values
+            const v = sceneById(kf.scene)?.values?.[state.targets[0]?.id];
+            if (v) Object.assign(out, v.on === false ? { dim: 0 } : { dim: v.dim, kelvin: v.kelvin });
+          }
           if (hasValidOn(kf)) {
             out.validOn = {};
             if (kf.validDays.length < 7) out.validOn.weekdays = kf.validDays.slice();
@@ -4633,7 +5104,9 @@ const translations = {
           return out;
         }),
         // Keyframe groups with their priority rule, see listGroups()
-        groups: listGroups().map(g => ({ id: g.id, rule: g.rule }))
+        groups: listGroups().map(g => ({ id: g.id, rule: g.rule })),
+        // Scenes mode: the targets and the scenes the keyframes call
+        ...(isScenesMode() ? { mode: 'scenes', targets: state.targets, scenes: state.scenes } : {})
       };
     }
 
@@ -4661,6 +5134,10 @@ const translations = {
         if (g && GROUP_IDS.includes(g.id) && GROUP_RULES.includes(g.rule)) state.groupRules[g.id] = g.rule;
       });
       pruneGroups();
+      state.mode = json.mode === 'scenes' ? 'scenes' : 'values';
+      state.targets = json.targets || [];
+      state.scenes = json.scenes || [];
+      normalizeScenes();
       saveState();
       updateUI();
       return true;
@@ -5208,6 +5685,11 @@ const translations = {
     function renderPico() {
       const details = document.getElementById('picoDetails');
       if (!details.open) return;
+      if (isScenesMode()) {
+        document.getElementById('picoOutput').value = '';
+        document.getElementById('picoNotes').innerHTML = `<div class="lkl-banner spaced">${t('pico_scenes_pending')}</div>`;
+        return;
+      }
       document.getElementById('picoBus').value = state.picoBus === 'free' ? 'free' : 'dali';
       const result = buildPicoScheduler();
       const text = picoJsonText(result);
@@ -5233,6 +5715,7 @@ const translations = {
     }
 
     function downloadPico() {
+      if (isScenesMode()) { alert(t('pico_scenes_pending')); return; }
       const text = picoJsonText(buildPicoScheduler());
       const blob = new Blob([text], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -5347,8 +5830,9 @@ const translations = {
         return [
           pdfText(describeTrigger(kf)),
           pdfText(validSummary(kf) || t('valid_daily')),
-          `${kf.dim}%`,
-          `${kf.kelvin}K`,
+          ...(isScenesMode()
+            ? [pdfText(sceneById(kf.scene)?.name || '–'), '']
+            : [`${kf.dim}%`, `${kf.kelvin}K`]),
           kf.mode === 'instant' ? t('mode_instant') : kf.mode === 'transition' ? t('mode_transition') : t('mode_interpolate'),
           transDisplay,
           curveDisplay
@@ -5357,7 +5841,7 @@ const translations = {
       
       doc.autoTable({
         startY: yPos,
-        head: [[t('pdf_time'), t('th_valid'), t('pdf_brightness'), t('pdf_kelvin'), t('pdf_mode'), t('pdf_transition'), t('pdf_curve')]],
+        head: [[t('pdf_time'), t('th_valid'), isScenesMode() ? t('th_scene') : t('pdf_brightness'), isScenesMode() ? '' : t('pdf_kelvin'), t('pdf_mode'), t('pdf_transition'), t('pdf_curve')]],
         body: tableData,
         margin: { left: margin, right: margin },
         styles: { fontSize: 9, cellPadding: 2 },
@@ -5538,6 +6022,10 @@ const translations = {
     // The instances' schedules may have changed since the page was opened
     document.getElementById('presetSelect').addEventListener('focus', loadHaSchedules);
     document.getElementById('haSaveBtn').addEventListener('click', saveToHa);
+    document.querySelectorAll('[data-page-tab]').forEach(btn =>
+      btn.addEventListener('click', () => showPage(btn.dataset.pageTab)));
+    document.querySelectorAll('[data-view-target]').forEach(select =>
+      select.addEventListener('change', e => setViewTarget(e.target.value)));
     document.getElementById('loadFileBtn').addEventListener('click', loadFileTop);
     document.getElementById('fileInputTop').addEventListener('change', handleFileImport);
     document.getElementById('downloadJsonBtn').addEventListener('click', downloadJson);
