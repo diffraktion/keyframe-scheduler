@@ -449,16 +449,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             except Exception as err:
                 _LOGGER.warning("Could not register static path for webapp: %s", err)
 
-    # Register sidebar panel (once — panels are global, not per entry)
+    # Register sidebar panel (once — panels are global, not per entry). The
+    # web app's modification time in the URL makes browsers load a new
+    # version after an update instead of showing the cached page.
     if not hass.data[DOMAIN].get("panel_registered"):
         try:
+            index_path = os.path.join(os.path.dirname(__file__), "www", "index.html")
+            try:
+                version = int(await hass.async_add_executor_job(os.path.getmtime, index_path))
+            except OSError:
+                version = 0
             frontend.async_register_built_in_panel(
                 hass,
                 component_name="iframe",
                 sidebar_title="Keyframe Scheduler",
                 sidebar_icon="mdi:chart-timeline-variant",
                 frontend_url_path=_PANEL_URL_PATH,
-                config={"url": f"{_STATIC_URL_PATH}/index.html"},
+                config={"url": f"{_STATIC_URL_PATH}/index.html?v={version}"},
                 require_admin=False,
             )
             hass.data[DOMAIN]["panel_registered"] = True
